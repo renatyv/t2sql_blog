@@ -4,7 +4,7 @@ description: "A SQL critic, a profile table of contents, and schema links were u
 pubDate: "2026-08-26"
 ---
 
-**TL;DR:** The profile bundle made 59% fewer database queries, but accuracy stayed flat and cost rose 16%. The critic burned tokens, the table of contents replaced SQL exploration with file reads, and schema linking remains unproven.
+**TL;DR:** The profile bundle made 59% fewer database queries, but accuracy stayed flat and cost rose 16%. The critic sub-agent added 56% more tokens and 58% more latency than inline self-critique without a measurable accuracy gain; the table of contents replaced SQL exploration with file reads, and schema linking remains unproven.
 
 **Experiment:** 500 [BIRD Mini-Dev](https://bird-bench.github.io/) questions were planned per arm. The raw arm completed 498; the profile arm completed 491. The primary metric is **execution accuracy**: the share of generated SQL queries whose result matches the gold query. Higher is better. The accuracy comparison below uses the 491 questions completed by both arms.
 
@@ -46,17 +46,20 @@ The accuracy difference was **−0.4 percentage points** (95% CI −2.6 to +1.8,
 
 ### 1. Add a critic sub-agent
 
-It reads the candidate SQL in a fresh context, compares it with the question, and looks for mistakes in projection, joins, filters, aggregation, and ordering. It ran in 985/989 completed arm-runs (99.6%).
+The critic reads the candidate SQL in a fresh context, compares it with the question, and looks for mistakes in projection, joins, filters, aggregation, and ordering. It ran in 985/989 completed arm-runs (99.6%).
 
-On the raw arm—the closest available comparison—the critic changed the result like this:
+To isolate the sub-agent, I reran the same 498 raw-arm questions without it. The main agent still performed the same critique inline, so this tests fresh-context critic dispatch rather than critique versus no critique.
 
-| Metric | Without critic | With critic | Change | What it means |
+| Metric | Inline self-critique | Critic sub-agent | Change | What it means |
 |---|---:|---:|---:|---|
-| Execution accuracy ↑ | 303/498 (60.8%) | 307/498 (61.6%) | +0.8 pp | Statistical noise |
-| Total tokens ↓ | 24.8M | 54.8M | +121% | More than doubled |
-| Total cost ↓ | $4.01 | $6.89 | +72% | Much more expensive |
+| Execution accuracy ↑ | 306/498 (61.4%) | 307/498 (61.6%) | +0.2 pp | No measurable difference |
+| Total tokens ↓ | 35.1M | 54.8M | +56% | More tokens |
+| Total cost ↓ | $4.52 | $6.89 | +53% | More expensive |
+| Latency/question ↓ | 35.9 s | 56.9 s | +58% | Slower |
 
-<p class="result-note"><strong>Verdict:</strong> no measurable accuracy gain for 121% more tokens.</p>
+The paired accuracy difference was **+0.2 percentage points** (95% CI −2.1 to +2.5, exact McNemar p=1.00). Of the 33 questions where the runs disagreed, the critic arm won 17 and lost 16.
+
+<p class="result-note"><strong>Verdict:</strong> no measurable accuracy gain for 56% more tokens, 53% more cost, and 58% more time.</p>
 
 ### 2. Add a table of contents to the database profile
 
