@@ -86,6 +86,44 @@ input {
 table {
 	width: 100%;
 }
+.prose table {
+	border-collapse: collapse;
+	display: block;
+	width: 100%;
+	margin: 2rem 0;
+	overflow-x: auto;
+	font-variant-numeric: tabular-nums;
+}
+.prose th,
+.prose td {
+	padding: 0.55rem 0.75rem;
+	border-bottom: 1px solid rgb(var(--gray-light));
+	vertical-align: top;
+}
+.prose th {
+	background: rgba(var(--gray-light), 45%);
+}
+.prose tbody tr:nth-child(even) {
+	background: rgba(var(--gray-light), 20%);
+}
+.result-note {
+	padding: 1rem 1.25rem;
+	border-left: 4px solid var(--accent);
+	background: rgba(var(--gray-light), 35%);
+}
+.result-chart {
+	margin: 2rem 0;
+	text-align: center;
+}
+.result-chart svg {
+	display: block;
+	width: 100%;
+	height: auto;
+}
+.result-chart figcaption {
+	color: rgb(var(--gray));
+	font-size: 0.9em;
+}
 img {
 	max-width: 100%;
 	height: auto;

@@ -4,26 +4,37 @@ description: "Does a pre-generated DB profile improve text-to-SQL accuracy? No �
 pubDate: "2026-08-15"
 ---
 
-**TL;DR:** Give pi, Codex, or Claude a database login and password.
+**TL;DR:** Give pi, Codex, or Claude a database login and password. A full database profile did not improve execution accuracy (25/300 correct versus 27/300) and used about 6× more input tokens.
 
 I needed a small analytics page with text-to-SQL, so I looked at the benchmarks and implemented what [BIRD](https://bird-bench.github.io/) winners [recommend](https://arxiv.org/abs/2505.19988): give the model a pre-generated database profile.
 
 But does that profile actually help? I tested it on the new [BEAVER benchmark](https://huggingface.co/datasets/BeaverBench/beaver). There is a catch: BEAVER uses hand-coded Python agents, turns reasoning off, and pre-retrieves and reranks tables (Qwen embedding top 50, reranker top 15).
 
-That raised a simpler question: what happens when agent can query the database directly? So I tested that too.
+That raised a simpler question: what happens when an agent can query the database directly? So I tested that too.
 
-#### Results
+**Experiment:** 300 seed-fixed [BEAVER](https://huggingface.co/datasets/BeaverBench/beaver) questions per arm: 100 each from neutron, nova, and dw. The primary metric is **execution accuracy**: the share of generated SQL queries whose result matches the gold query. Higher is better.
 
-- **SQL accuracy have not improved** against "gold" queries.
+## Results at a glance
 
-| Database | pi + DB login & password | pi + DB login & password + profile |
-|---|---|---|
-| neutron | 13% | 13% |
-| nova | 9% | 8% |
-| dw | 5% | 4% |
+| Database | Raw DB access | Full profile | Change | What it means |
+|---|---:|---:|---:|---|
+| neutron | 13/100 (13%) | 13/100 (13%) | 0 pp | No change |
+| nova | 9/100 (9%) | 8/100 (8%) | −1 pp | No improvement |
+| dw | 5/100 (5%) | 4/100 (4%) | −1 pp | No improvement |
+| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **−0.7 pp** | **No aggregate gain** |
 
-- **Input tokens grew by about 6×** across runs. The full profile is included in every context; on the largest database, it alone cost about 9× more per run than the direct-access arm.
-- **Turns fell from about 4.6 to 2.2, and database queries from 7.8 to 1.3.** The agent read the profile, stopped asking questions, and reached the wrong answer faster.
+The profile changed cost and behavior, not correctness:
+
+| Metric | Raw DB access | Full profile | Change | What it means |
+|---|---:|---:|---:|---|
+| Execution accuracy ↑ | 27/300 (9.0%) | 25/300 (8.3%) | −0.7 pp | No improvement |
+| Input tokens/question ↓ | 1× baseline | about 6× | about +500% | Much larger prompts |
+| Turns/question ↓ | 4.6 | 2.2 | −52% | The agent stopped sooner |
+| DB queries/question ↓ | 7.8 | 1.3 | −83% | The agent explored less |
+
+<p class="result-note"><strong>Bottom line:</strong> the agent read the profile, asked fewer questions, and reached the wrong answer faster.</p>
+
+The full profile was included in every context. On the largest database, the profile text alone added about nine times the direct-access arm's input-token volume per run.
 
 ### How I tested
 
@@ -37,13 +48,14 @@ That raised a simpler question: what happens when agent can query the database d
 
 ### The third arm: metadata instead of the full profile
 
-| Database | agent | agent + Profile | agent + Metadata |
-|---|---|---|---|
-| neutron | 13% | 13% | 13% |
-| nova | 9% | 8% | 11% |
-| dw | 5% | 4% | 3% |
+| Database | Raw DB access | Full profile | Compact metadata | Metadata change vs raw |
+|---|---:|---:|---:|---:|
+| neutron | 13/100 (13%) | 13/100 (13%) | 13/100 (13%) | 0 pp |
+| nova | 9/100 (9%) | 8/100 (8%) | 11/100 (11%) | +2 pp |
+| dw | 5/100 (5%) | 4/100 (4%) | 3/100 (3%) | −2 pp |
+| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **27/300 (9.0%)** | **0 pp** |
 
-Maybe the full profile is simply too much context. For a third arm, I gave the agent a compact summary built from the profile and schema links.
+Maybe the full profile is simply too much context. For a third arm, I gave the agent a compact summary built from the profile and schema links. It matched raw access overall, but the per-database movements were only a few questions and are descriptive, not evidence of an improvement.
 
 The same coding agent generated that metadata in the same sandbox from two artifacts:
 
