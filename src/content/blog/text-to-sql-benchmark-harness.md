@@ -4,9 +4,9 @@ description: "Four small harness decisions that can make a working text-to-SQL a
 pubDate: "2026-08-24"
 ---
 
-**TL;DR:** Before comparing text-to-SQL agents, fix the harness.
+**TL;DR:** Simple ways to make text2SQL worse.
 
-While testing whether a [database profile helps a coding agent](/blog/profiler-doesnt-help/), I found several ways to ruin the benchmark
+While testing whether a [database profile helps a coding agent](/blog/profiler-doesnt-help/), I found several ways to ruin the benchmark results
 
 ### 1. LIMIT 5 leaked to the answer
 
