@@ -89,9 +89,14 @@ table {
 .prose table {
 	border-collapse: collapse;
 	display: block;
-	width: 100%;
+	width: max-content;
+	min-width: 100%;
+	max-width: calc(100vw - 4rem);
 	margin: 2rem 0;
+	margin-left: 50%;
 	overflow-x: auto;
+	transform: translateX(-50%);
+	font-size: 0.9em;
 	font-variant-numeric: tabular-nums;
 }
 .prose th,
@@ -99,12 +104,27 @@ table {
 	padding: 0.55rem 0.75rem;
 	border-bottom: 1px solid rgb(var(--gray-light));
 	vertical-align: top;
+	white-space: nowrap;
 }
 .prose th {
 	background: rgba(var(--gray-light), 45%);
 }
 .prose tbody tr:nth-child(even) {
 	background: rgba(var(--gray-light), 20%);
+}
+.metric-good,
+.metric-bad,
+.metric-neutral {
+	font-weight: 700;
+}
+.metric-good {
+	color: #137333;
+}
+.metric-bad {
+	color: #b42318;
+}
+.metric-neutral {
+	color: rgb(var(--gray));
 }
 .result-note {
 	padding: 1rem 1.25rem;
