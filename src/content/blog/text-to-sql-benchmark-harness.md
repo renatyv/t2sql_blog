@@ -1,5 +1,5 @@
 ---
-title: "Your text-to-SQL benchmark is testing the harness"
+title: "Four evaluation bugs that make a text-to-SQL pipeline look broken"
 description: "Four small harness decisions that can make a working text-to-SQL agent look broken."
 pubDate: "2026-08-24"
 ---

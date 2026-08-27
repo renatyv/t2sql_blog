@@ -1,5 +1,5 @@
 ---
-title: "Why I built db-snooper"
+title: "Why I built database profiler, db-snooper"
 description: "A compact database profile for SQL agents—and the mistakes that made it useful."
 pubDate: "2026-08-27"
 ---

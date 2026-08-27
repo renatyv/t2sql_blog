@@ -1,5 +1,5 @@
 ---
-title: "What changed text-to-SQL accuracy—and what only changed cost"
+title: "Text-to-SQL ablations: reasoning, retrieval, and critics"
 description: "A SQL critic, profile retrieval, and reasoning-effort ablations on 498 BIRD Mini-Dev questions."
 pubDate: "2026-08-26"
 ---

@@ -1,5 +1,5 @@
 ---
-title: "Why I built schema-linker"
+title: "Why I built database schema-linker"
 description: "A compact map of missing database joins for SQL agents—and the false positives that shaped it."
 pubDate: "2026-08-27"
 ---
