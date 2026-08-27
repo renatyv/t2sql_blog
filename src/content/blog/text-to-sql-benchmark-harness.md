@@ -4,11 +4,15 @@ description: "Four small harness decisions that can make a working text-to-SQL a
 pubDate: "2026-08-24"
 ---
 
-**TL;DR:** Four harness choices produced false failures or unpredictable runs. These are observed failure modes; I did not measure a separate accuracy effect for each one.
+**Results**
+1) Asking for `LIMIT 5` during exploration leaked the limit into final SQL.
+2) Capping database responses at 100 rows made correct queries fail evaluation.
+3) Letting the agent use all 15 turns for exploration produced missing answers.
+4) Relying on the model's default context window made runs unpredictable.
 
-While testing whether a [database profile helps a coding agent](/blog/profiler-doesnt-help/), I found several ways to ruin the benchmark results.
+**Experiment:** While testing whether a [database profile helps a coding agent](/blog/profiler-doesnt-help/), I observed four harness failure modes. I did not isolate a separate accuracy effect for each one. The values `5`, `100`, `15`, and `128k` below are configuration values, not accuracy results.
 
-**How to read the numbers:** `5`, `100`, `15`, and `128k` below are harness configuration values, not accuracy results.
+## Results at a glance
 
 | Harness decision | What broke | Score symptom | Final rule |
 |---|---|---|---|
@@ -35,7 +39,7 @@ An agent spent its full 15-turn budget inspecting tables. I reserved turn 15 for
 
 pi defaults to a 128k-token context window for unknown models. That number is a fallback setting, not the model limit I intended to test.
 
-## The boring harness I ended up with
+### The boring harness I ended up with
 
 - A fresh Docker container per question
 - A SELECT-only database account

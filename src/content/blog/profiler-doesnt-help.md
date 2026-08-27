@@ -1,18 +1,23 @@
 ---
-title: "Want custom text-to-SQL?"
-description: "Does a pre-generated DB profile improve text-to-SQL accuracy? No — but it 6x'd the tokens."
+title: "A database profile changed text-to-SQL cost—not accuracy"
+description: "A three-arm BEAVER benchmark of raw database access, a full profile, and compact metadata."
 pubDate: "2026-08-15"
 ---
 
-**TL;DR:** Give pi, Codex, or Claude a database login and password. A full database profile did not improve execution accuracy (25/300 correct versus 27/300) and used about 6× more input tokens.
-
-I needed a small analytics page with text-to-SQL, so I looked at the benchmarks and implemented what [BIRD](https://bird-bench.github.io/) winners [recommend](https://arxiv.org/abs/2505.19988): give the model a pre-generated database profile.
-
-But does that profile actually help? I tested it on the new [BEAVER benchmark](https://huggingface.co/datasets/BeaverBench/beaver). There is a catch: BEAVER uses hand-coded Python agents, turns reasoning off, and pre-retrieves and reranks tables (Qwen embedding top 50, reranker top 15).
-
-That raised a simpler question: what happens when an agent can query the database directly? So I tested that too.
+**Results**
+1) A full database profile did not improve execution accuracy: 25/300 correct versus 27/300 with raw database access.
+2) The full profile used about 6× more input tokens and made the agent query the database 83% less often.
+3) Compact metadata matched raw database access at 27/300 correct.
 
 **Experiment:** 300 seed-fixed [BEAVER](https://huggingface.co/datasets/BeaverBench/beaver) questions per arm: 100 each from neutron, nova, and dw. The primary metric is **execution accuracy**: the share of generated SQL queries whose result matches the gold query. Higher is better.
+
+I compared three ways to give the coding agent database context:
+
+1. Direct access to the raw database.
+2. A full pre-generated database profile, as [BIRD](https://bird-bench.github.io/) winners [recommend](https://arxiv.org/abs/2505.19988).
+3. Compact metadata derived from the profile and schema links.
+
+BEAVER's reference setup differs: it uses hand-coded Python agents, turns reasoning off, and pre-retrieves and reranks tables (Qwen embedding top 50, reranker top 15).
 
 ## Results at a glance
 
@@ -64,7 +69,9 @@ The same coding agent generated that metadata in the same sandbox from two artif
 
 A one-off pi agent run—using the same Docker isolation and SELECT-only account, with no access to benchmark questions or answers—read both files and wrote a short `<db>.md`. It contained **Clarified Semantics** and **Potential Join Strategies**, including join predicates and cardinality caveats. That 26–43-line file was the input for the `metadata` arm. The harness also has a fourth arm with both the profile and metadata, but the headline run used three.
 
-## Pitfalls and bad ideas encountered
+<p class="result-note"><strong>Verdict:</strong> compact metadata changed which questions the agent answered correctly, but not aggregate accuracy. Raw database access remained the simplest option.</p>
+
+### Pitfalls and bad ideas encountered
 
 - pi silently defaults to a 128k context window for unknown models.
 - Do not tell the agent to add `LIMIT 5` to exploratory queries. It may append that limit to its final SQL, which tanks execution accuracy.
