@@ -12,6 +12,8 @@ I needed text-to-SQL for an analytics page. Database access worked, but every ru
 
 The paper [Automatic Metadata Extraction for Text-to-SQL](https://arxiv.org/abs/2505.19988) inspired me to create db-snooper: generate database context once instead of making the model rediscover it for every question.
 
+Models and agent harnesses will keep improving, so prompt tricks such as critics, rankers, and parallel candidate generation may be automated away or become irrelevant. A deterministic database profile should remain useful regardless of which model reads it.
+
 A schema was not enough. `status text` says less than `active=8,412, cancelled=327`. Foreign keys show possible joins; samples and null rates show whether they are useful.
 
 I wanted a reusable file for an agent to read it before writing or debugging SQL, without live production access. It also helps with database exploration and migration review. Because profiles contain real data, they must be protected like database exports.

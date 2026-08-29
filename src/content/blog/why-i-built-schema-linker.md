@@ -12,6 +12,8 @@ Text-to-SQL often fails before the SQL becomes complicated: it chooses the wrong
 
 The project was inspired by the paper [*Automatic Metadata Extraction for Text-to-SQL*](https://arxiv.org/abs/2505.19988). Its central idea—that understanding database contents is often harder than writing the query—led me to treat missing join paths as metadata that could be extracted automatically.
 
+Models and agent harnesses will keep improving, so prompt tricks such as critics, rankers, and parallel candidate generation may be automated away or become irrelevant. Deterministic join discovery should remain useful regardless of which model consumes its output.
+
 I wanted to discover these missing relationships once and give them to an agent as reusable context. The same file helps with multi-table queries, unfamiliar databases, join debugging, and legacy-schema documentation.
 
 ## What it does
