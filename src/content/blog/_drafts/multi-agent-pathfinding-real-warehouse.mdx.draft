@@ -1,0 +1,138 @@
+---
+title: "Multi-agent pathfinding in a real robotic warehouse"
+description: "What changed when textbook paths met robot footprints, physical timing, committed motion, and warehouse throughput."
+pubDate: "2026-09-02"
+---
+
+import { Image } from 'astro:assets';
+import multiAgentPathfindingGrid from '../../../assets/multi-agent-pathfinding-grid.png';
+import robotHandlingContainer from '../../../assets/volume-dive-robot-handling-container.png';
+import robotOnGrid from '../../../assets/volume-dive-robot-on-grid.png';
+
+**TL;DR:** Textbook multi-agent pathfinding treats robots as points moving between grid cells in synchronized time steps. None of those assumptions held in our warehouse. We used space-time A*, physical swept-area reservations, an exact static travel-time heuristic, and incremental prioritized planning.
+
+## The warehouse and robots
+
+[Volume DIVE](https://volume.eu/en/warehouse-automation-company/container-warehouse/) is a compact container-storage system in which the storage rack is also the robots' road network.
+
+<div class="warehouse-overview">
+
+<figure>
+
+<Image
+  src={robotOnGrid}
+  width={600}
+  alt="A Volume DIVE robot traveling across a dense rail grid above container towers"
+/>
+
+<figcaption><strong>The warehouse.</strong> Rails surround the container towers on every level.</figcaption>
+</figure>
+
+<figure>
+
+<Image
+  src={robotHandlingContainer}
+  width={600}
+  alt="A Volume DIVE robot viewed from above while reaching into a neighboring container tower"
+/>
+
+<figcaption><strong>Handling a container.</strong> The robot reaches sideways while its base stays on the rails.</figcaption>
+</figure>
+
+</div>
+
+Horizontal rails form a grid on each level. Standard plastic containers are stored in stacks between the rails. Small mobile robots, called **Snappers**, drive over the grid and move containers between stacks and ports.
+
+A robot can move forward and backward, steer between the two rail directions, and rotate its gripper tower through 360 degrees. The gripper can extend beyond the robot body to take or place a container on any side. The steel grid spans multiple independent levels, and columns supporting higher levels become obstacles. Several robots operate simultaneously on each level.
+
+Finding the shortest route for one robot is straightforward. Coordinating many robots on the same compact grid—while some are moving, waiting, carrying containers, or already committed to other tasks—is not.
+
+## The multi-robot route-planning problem
+
+<figure>
+
+<Image
+  src={multiAgentPathfindingGrid}
+  width={600}
+  alt="A multi-agent pathfinding example on a grid"
+/>
+
+<figcaption><strong>Textbook MAPF.</strong> Agents move between grid cells without sharing a vertex or crossing the same edge at the same time.</figcaption>
+</figure>
+
+A common model for multi-robot routing is [multi-agent pathfinding (MAPF)](https://en.wikipedia.org/wiki/Multi-agent_pathfinding). There is a graph, each robot has a start and a goal, and the planner must find paths without vertex or edge collisions.
+
+That is a useful foundation, but it omits much of what made pathfinding difficult in our warehouse.
+
+| Clean MAPF model | Warehouse reality |
+|---|---|
+| Position is a graph vertex representing `(x, y)` | State includes cell, level, gripper-tower orientation, and wheel orientation |
+| Goal positions are unique | Robots may deliver several containers to the same destination at different times |
+| A robot occupies one vertex | A robot's footprint extends beyond one cell and can block neighboring cells |
+| Every move takes one time step | Moving, steering, rotating, and waiting have different measured durations |
+| All paths are planned together | Some trajectories are already committed and cannot be changed safely |
+| Reaching the goal completes the plan | The destination must remain usable during the next physical operation |
+| The plan is executed exactly | Hardware can lag, stop, disconnect, or report an unexpected state |
+
+The difficult part was turning geometry, mechanics, and timing into searchable states and reservations.
+
+## A state is more than a cell
+
+Two robots at the same grid coordinate are not necessarily in equivalent states. One may have its wheels aligned along the X axis and another along Y. Their next legal actions and action durations differ. The gripper-tower orientation determines how the robot can approach a storage location and changes its footprint near obstacles.
+
+Our route-search state therefore contains the grid position, warehouse level, wheel orientation, and gripper-tower orientation. Route search begins with the gripper retracted; extending it is handled as a separate physical operation outside the route graph.
+
+This makes the graph larger, but it avoids producing a cell path that cannot be translated into safe robot commands. Steering and tower rotation are graph edges even when the robot remains in the same cell, because both consume time and physical space.
+
+## Collision checking uses swept areas
+
+Cell-level collision rules were not enough. A robot body can extend outside its current cell, and a movement sweeps through every position between its start and finish. Columns, narrow cells, ports, and prohibited areas also have physical geometry that does not fit a simple “one robot per cell” rule.
+
+For every possible action, the planner calculates rectangles covering the swept robot footprint. A reservation combines those rectangles with a time interval. Space-time A* rejects an action when its reservation intersects a reservation belonging to another robot.
+
+This gives us one collision model for several cases:
+
+- A moving robot crossing another robot's trajectory.
+- A rotating robot clipping a column or another robot.
+- A stationary robot blocking an aisle.
+- A robot occupying a destination after arrival.
+- Extra clearance required near ports and other special areas.
+
+## Time is part of the map
+
+Route search visits a `(state, time)` pair rather than only a robot state. Action durations come from configured physical timings and, for movement, the actual cell sizes in millimetres.
+
+A simple distance heuristic was too weak because it ignored steering, orientation, unequal cell sizes, and different action durations. We therefore precomputed the exact travel time between static robot states with Dijkstra and used it as an admissible lower bound during space-time A*. Compact state encoding kept the lookup table small enough to use efficiently.
+
+Waiting is an action rather than an error. A robot may have a clear geometric route but need to pause until another robot releases an intersection. At the goal, the planner also checks that the robot can remain there for a requested time. Otherwise it could return a route that reaches a port but conflicts with another robot during the container operation immediately afterward.
+
+## We did not solve every robot jointly
+
+Jointly optimizing every robot path is attractive on paper and expensive in practice. Our controller already has committed actions, ongoing tasks, immobile robots, and new work arriving continuously. Recomputing one globally optimal plan would create a large search problem and make a small change disturb unrelated work.
+
+We use prioritized planning instead:
+
+1. Keep reservations for actions that are already committed.
+2. Plan a path for one robot around those reservations.
+3. Reserve the new path.
+4. Plan the next robot around everything reserved so far.
+
+This approach is fast, incremental, and easy to inspect, but it is incomplete: an unlucky planning order can block a solution that another order would find.
+
+When several robots must move, the controller tries deterministic robot orders. If an order fails, it avoids retrying another order with the same failing prefix. This bounded search addresses the ordering failures we encounter without requiring a general optimal MAPF solver.
+
+The result is not guaranteed to be optimal. It does provide useful failure messages and reproducible tests—properties that matter in an operational controller.
+
+## Safety margins can become traffic jams
+
+Our first safe reservation for a straight move covered the full swept rectangle for the entire action. That was conservative, but it blocked space the robot had already left. In a dense warehouse, many individually reasonable margins combine into unnecessary traffic.
+
+We now split a move into two reservation phases. During the first phase, the reservation covers both the start and destination sides of the movement. During the second, it releases the cleared part and keeps the remaining area reserved. The midpoint is calculated from distance travelled in millimetres rather than half the number of cells, because cells can have different physical sizes. A configurable timing tolerance delays the release to account for real hardware variation.
+
+Releasing space early is safe only after the controller confirms that the robot has progressed far enough. If telemetry is late or uncertain, the occupied area remains reserved.
+
+## Conclusion
+
+MAPF gave us the vocabulary for the problem, but production safety came from modelling the details that benchmarks abstract away: orientation, physical footprint, continuous time, and committed motion.
+
+Our planner is not globally optimal or complete. It is fast, deterministic, debuggable, and conservative when the physical world disagrees with its model. In the warehouse, those properties mattered more.
