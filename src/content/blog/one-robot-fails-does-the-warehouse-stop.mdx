@@ -1,0 +1,120 @@
+---
+title: "One Robot Fails. Does the Warehouse Stop?"
+description: "How a robotic warehouse contains failures, recovers uncertain state, and keeps unaffected robots working."
+pubDate: "2026-09-02"
+---
+
+import { Image } from 'astro:assets';
+import fixingTheRobot from '../../assets/fixing_the_robot.jpeg';
+import robotHandlingContainer from '../../assets/volume-dive-robot-handling-container.png';
+import robotOnGrid from '../../assets/volume-dive-robot-on-grid.png';
+
+<figure>
+<Image
+  src={fixingTheRobot}
+  width={420}
+  alt="A mechanic repairing a warehouse robot"
+/>
+</figure>
+
+**TL;DR**  
+A robotic warehouse shouldn’t stop working just because one robot does. After a failure, the controller has to establish what the robot is physically doing, contain the uncertain area, and escalate only as far as necessary. Sometimes that means one automatic command. Sometimes it means parking the robot as *unusable*.
+
+## Motivation
+
+Is reliability and error handling even worth discussing? I counted commits whose subject explicitly contained failure vocabulary such as *recovery*, *failed*, *timeout*, *alarm*, *N_RDY*, *NOT_IN_USE*, *RFID*, *mismatch*, *ACK*, or *exception*. It is a rough proxy, but the trend is hard to miss:
+
+| Year |  Share |
+| --- |  ---: |
+| 2022 | 2.1% |
+| 2023 | 3.9% |
+| 2024 | 7.6% |
+| 2025 | 11.3% |
+| 2026 through September 2 | 27.3% |
+
+For the last months most of what I was doing is error-handling. Software, hardware, and human errors.
+
+## The warehouse
+
+[Volume DIVE](https://volume.eu/en/warehouse-automation-company/container-warehouse/) is a tight container-storage system where the storage rack doubles as the robots’ road network. Rails form a grid around stacks of containers on several levels. Small mobile robots—**Snappers**—drive over that grid and move containers between the stacks and the operator ports.
+
+<div class="warehouse-overview">
+
+<figure>
+<Image
+  src={robotOnGrid}
+  width={600}
+  alt="A Volume DIVE robot traveling across a dense rail grid above container towers"
+/>
+<figcaption><strong>The warehouse.</strong> Rails surround the container stacks on every level.</figcaption>
+</figure>
+
+<figure>
+<Image
+  src={robotHandlingContainer}
+  width={600}
+  alt="A Volume DIVE robot viewed from above while reaching into a neighboring container tower"
+/>
+<figcaption><strong>Handling a container.</strong> The robot reaches sideways while its base stays on the rails.</figcaption>
+</figure>
+
+</div>
+
+Each robot can drive in two directions on the rails, rotate its gripper tower, and stretch the gripper past its own body. Because several robots share the same dense grid, any machine that stops or does something unexpected instantly becomes a physical obstacle for everyone nearby.
+
+Picture this: a robot accepts a move, enters an intersection, and hangs in wrong state. You can’t just mark the task as failed. The robot is still sitting in physical space, it might still be rolling, its gripper may be extended into a stack, and it may now be blocking the paths of several other robots.
+
+That’s the core recovery problem. The controller’s records say what *should* have happened; safety depends on what *actually* happened. We learned to handle it in three steps:
+
+1. Establish the robot’s real physical state and inspect all reported errors.
+2. Contain the area whose safety is now uncertain.
+3. Escalate only as far as necessary until the warehouse can continue operation.
+
+
+Reliability is not a finishing pass, it becomes a large part of the product.
+
+## 1. Establish the physical state
+
+In pure software you can often just retry a failed operation. A robot command changes the physical world. Retrying without knowing what already happened can make things worse.
+
+We saw failures at many places:
+
+- **Motion** — robot stopped between cells, ignored a command, or could no longer steer properly because a clutch loosened or a belt stretched.  
+- **Mechanics** — wires broke, motors overheated, batteries died, containers got damaged or sat crooked in a stack.  
+- **State and identity** — operator scanned the wrong container, robot was holding something different from what the controller expected, or an unregistered test robot suddenly appeared on the grid.  
+- **Communication** — a connection dropped while the controller still needed to know whether the robot had stopped.
+- **Environment** — loose hardware landed on the rails or someone hit the emergency-stop button.
+
+And more often than not, we see a combination of those. A disconnected robot might be stationary or still rolling. A stopped robot might be safely centered on an intersection or stranded between two cells. It might be holding a container with the gripper stuck out. Each case needs a different recovery action.
+
+Not every delay is a failure, either. At a port an operator might still be working with a container. A known delay can keep going; a lost message, wrong container, or abandoned operation creates an unknown state that has to be sorted out first.
+
+A failed cell-to-cell drive mostly creates uncertainty about a robot position. A failed TAKE or PUT creates uncertainty about both a robot and a container(!): is the box still on the stack, inside the gripper, or somewhere between those two facts? RFID looked like an easy answer until we saw hardware failing, in particular the RFID sensors giving the wrong box numbers.
+
+## 2. Contain the uncertainty
+
+Robots share a dense rail grid. When one stops, its failure changes the safe operating area for every other robot on that level. None of those robots should be heading toward space that is no longer free.
+
+So the software blocks the uncertain robot’s physical area before it tries any recovery. For a failed motion, it preserves the action’s swept reservation—not merely the robot’s last reported cell. For an idle  robot, it reserves the space occupied by its current body and gripper pose far into the future. Other robots can keep working outside that zone as long as a safe route still exists.
+
+This matters even more when a robot simply takes longer than expected. You can’t release its reserved space just because the planned reservation expired. The controller has to confirm that the robot actually moved far enough; otherwise the occupied area stays blocked.
+
+## 3. Escalate only as far as necessary
+
+Stopping the entire warehouse and calling an operator for every problem sounds easy and safe, but it isn’t workable. Development hardware never works perfectly, and early production hardware fails often enough that the system has to degrade gracefully.
+
+We use a simple escalation ladder:
+
+1. **Recover automatically** — acknowledge a proven-safe alarm, retract the gripper, pull a robot back to a known intersection, or realign its wheels when the controller has enough trustworthy state.
+2. **Isolate the robot** — mark it `RECOVERING`, `MALFUNCTION`, or `NOT_IN_USE` and block its occupied space while other robots continue elsewhere.
+3. **Evacuate it** — move the robot to a service station if it can still travel safely.
+4. **Block the level** — stop traffic on the affected level when the failure can’t be contained locally.
+5. **Stop the warehouse** — escalate to a full stop only when the controller can no longer establish a safe operating area.
+
+The controller only moves up the ladder when it knows enough to avoid making the uncertainty worse. If one recovery strategy crashes, the transaction is rolled back and the result becomes `NOT_RECOVERABLE`; the next strategy does not continue on top of half-written state. Availability is valuable, but corrupted certainty is worse than a parked robot.
+
+## Be cautios of these phrases
+
+- **“This failure will be extremely rare; we can stop the warehouse.”** It will happen ten times on the day you most need throughput.
+- **“Just call an operator.”** Manual recovery is still a state machine. Give people constrained actions and show them the evidence, or they will create a second unknown state while fixing the first.
+- **“The controller is above the hardware layer; it doesn’t need raw sensor data.”** Recovery is where abstractions leak. Without the raw sensor state, wheel encoder values, lift height, gripper state, extension, and others, the only remaining diagnostic tool is climbing into the warehouse and kicking boxes.
