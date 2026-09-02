@@ -4,6 +4,12 @@ description: "What changed when textbook paths met robot footprints, timing unce
 pubDate: "2026-09-02"
 ---
 
+import { Image } from 'astro:assets';
+import fixingTheRobot from '../../assets/fixing_the_robot.jpeg';
+import multiAgentPathfindingGrid from '../../assets/multi-agent-pathfinding-grid.png';
+import robotHandlingContainer from '../../assets/volume-dive-robot-handling-container.png';
+import robotOnGrid from '../../assets/volume-dive-robot-on-grid.png';
+
 **TL;DR:** Planning paths for actual robots in a warehouse cannot treat robots as points that move synchronously from one grid cell to another. Our approach takes into account both space and time, keeps track of the physical area covered by each action to avoid collisions.
 
 ## The warehouse and robots
@@ -14,31 +20,38 @@ Compact container-storage machine called [Volume DIVE](https://volume.eu/en/ware
 
 <figure>
 
-![A Volume DIVE robot traveling across a dense rail grid above container towers](./volume-dive-robot-on-grid.png)
+<Image
+  src={robotOnGrid}
+  width={600}
+  alt="A Volume DIVE robot traveling across a dense rail grid above container towers"
+/>
 
 <figcaption><strong>The warehouse.</strong> Rails surround the container towers on every level.</figcaption>
 </figure>
 
 <figure>
 
-![A Volume DIVE robot viewed from above while reaching into a neighboring container tower](./volume-dive-robot-handling-container.png)
+<Image
+  src={robotHandlingContainer}
+  width={600}
+  alt="A Volume DIVE robot viewed from above while reaching into a neighboring container tower"
+/>
 
 <figcaption><strong>Handling a container.</strong> The robot reaches sideways while its base stays on the rails.</figcaption>
 </figure>
 
-<!--<figure>
+{/* <figure>
 
-![A blue Volume DIVE Snapper warehouse robot riding on the rail grid](./volume-dive-snapper-robot.png)
+![A blue Volume DIVE Snapper warehouse robot riding on the rail grid](../../assets/volume-dive-snapper-robot.png)
 
 <figcaption><strong>The robot.</strong> A Snapper moving on the rail grid.</figcaption>
 </figure>
 
-<figure>-->
-<!--
-![The controller view of warehouse level zero, showing grid coordinates and two robots](./volume-dive-controller-grid.png)
+<figure>
+![The controller view of warehouse level zero, showing grid coordinates and two robots](../../assets/volume-dive-controller-grid.png)
 
 <figcaption><strong>The controller's map.</strong> The same warehouse represented as grid cells and robot footprints.</figcaption>
-</figure>-->
+</figure> */}
 
 </div>
 
@@ -59,6 +72,17 @@ The grid:
 To optimize system perforamnce, e.g., number of boxed moved per hour, robots should travel fast. Finding the shortest route for one robot is straightforward. Coordinating many robots on the same compact grid—while some are moving, waiting, carrying containers, or failing—is not.
 
 ## The multi-robot route planning problem
+
+<figure>
+
+<Image
+  src={multiAgentPathfindingGrid}
+  width={600}
+  alt="A multi-agent pathfinding example on a grid"
+/>
+
+<figcaption><strong>Handling a container.</strong> The robot reaches sideways while its base stays on the rails.</figcaption>
+</figure>
 
 Standard solution to multi-robot routing is [Multi-agent pathfinding (MAPF)](https://en.wikipedia.org/wiki/Multi-agent_pathfinding): There is a graph, each robot has a unique start and a unique goal, and the planner must find paths without vertex or edge collisions.
 
@@ -106,15 +130,6 @@ Simple function estimating distance called 'heuristic', which are essential for 
 
 Waiting is an action rather than an error. A robot may have a clear geometric route but need to pause until another robot releases an intersection. At the goal, the planner also checks that the robot can remain there for a requested time. Otherwise it could return a route that technically reaches a port but conflicts with another robot during the box operation immediately afterwards.
 
-## Unpredictable humans is a real issue
-
-When box is delivered to a port, an operator needs to put or take some ites to or from the box. The port is being occupied for unknown amount time. This rises multiple questions
-- When should robot come to store the box back to the grid?
-- Should robot wait at port until the box is ready to be stored?
-- Should other robots start digging for next boxes to move them closer to port?
-
-There are no obvious answers to them. Make simulations, add configuration toggles, and try what works best in production.
-
 ## We did not solve every robot jointly
 
 Jointly optimizing every robot path is attractive on paper and expensive in practice. Our controller already has committed actions, ongoing tasks, immobile robots, and new work arriving continuously. Recomputing one globally optimal plan would create a large search problem and make a small change disturb unrelated work.
@@ -140,10 +155,23 @@ We now split a move into two reservation phases. During the first phase, the res
 
 **But it is not free** If the controller releases the first part of the path, it must verify that the real robot has progressed far enough. Otherwise **BANG!**.
 
+## Unpredictable humans is a real issue
+
+When box is delivered to a port, an operator needs to put or take some ites to or from the box. The port is being occupied for unknown amount time. This rises multiple questions
+- When should robot come to store the box back to the grid?
+- Should robot wait at port until the box is ready to be stored?
+- Should other robots start digging for next boxes to move them closer to port?
+
+There are no obvious answers to them. Make simulations, add configuration toggles, and try what works best in production.
+
 ## Things go wrong
 <figure>
 
-![A mechanic fixing a broken robot](./fixing_the_robot.jpeg)
+<Image
+  src={fixingTheRobot}
+  width={720}
+  alt="A mechanic fixing a broken robot"
+/>
 
 </figure>
 
@@ -171,4 +199,4 @@ The first idea was 'Just stop the warehouse and let the operator fix the problem
 
 ## Conclusion
 
-Research papers on MAPF is a great starting point. A papier may look nice and the algorithm can hold top position on benchmarks, but applying it to the real world can he too complex. But to advance research, industry needs to be honest about real problems.
+Research papers on MAPF is a great starting point. A papier may look nice and the algorithm can hold top position on benchmarks, but actually using it is a whole lot more.
