@@ -1,0 +1,38 @@
+---
+title: "Sometimes a software bug needs a hardware fix"
+description: "How to decide whether a warehouse failure belongs in mechanics, firmware, robot software, or orchestration."
+pubDate: "2026-09-02"
+---
+
+<!-- Draft: rename to .md when ready to publish. -->
+
+**Thesis:** Software can compensate for noisy hardware, but every compensation adds state, delay, and another way for the digital warehouse to diverge from the physical one. Sometimes the smallest reliable fix is a sensor, marker, or mechanical change.
+
+## Opening scenario
+
+Start with a bug that accumulated software workarounds: larger timeouts, wider safety margins, extra retries, and special states. Then show the hardware change that removed most of them.
+
+## Decision framework
+
+Ask five questions:
+
+1. Can software observe the failure unambiguously?
+2. Can it recover without risking a box, robot, or person?
+3. Is the failure repeatable enough to test?
+4. What throughput is lost by the workaround?
+5. Would one physical fix remove several software branches?
+
+## Candidate examples
+
+- Inconsistent stopping distance handled by reservation padding versus motor calibration.
+- Ambiguous position handled by state inference versus better markers or sensors.
+- Misaligned loads handled by retries versus a mechanical guide.
+- Unreliable box detection handled by reconciliation logic versus sensor placement.
+
+## Important counterpoint
+
+Hardware cannot solve every edge case, and field upgrades may be expensive. Software still needs safe boundaries, timeouts, and recovery for residual failures. The argument is against automatic software compensation, not against defensive software.
+
+## Ending
+
+Put the fix at the lowest layer that can make the behavior deterministic. Every higher layer should handle remaining uncertainty, not recreate the missing physical signal.

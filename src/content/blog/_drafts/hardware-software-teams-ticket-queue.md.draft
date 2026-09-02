@@ -1,0 +1,33 @@
+---
+title: "Hardware and software teams cannot collaborate through a ticket queue"
+description: "How organizational boundaries turn physical uncertainty into unnecessary software abstraction."
+pubDate: "2026-09-02"
+---
+
+<!-- Draft: rename to .md when ready to publish. -->
+
+**Thesis:** Interfaces between teams are necessary, but strict separation encourages each side to hide uncertainty behind a cleaner contract. The resulting abstractions look tidy while the warehouse becomes harder to diagnose.
+
+## Opening scenario
+
+Software reports that a robot violated the movement contract. Hardware reports that the command was valid under nominal tolerances. Both reports are correct, and neither explains why the robot is blocking an aisle.
+
+## Outline
+
+1. **Why ticket-driven separation is attractive.** Ownership is clear and parallel work is easier to schedule.
+2. **How it fails.** Logs stop at subsystem boundaries, vocabulary differs, and each team adds compensation rather than changing a shared assumption.
+3. **The cost appears as abstraction.** Generic error codes, duplicated state machines, widening timeouts, and adapters that erase diagnostic facts.
+4. **Use joint failure analysis.** Reconstruct a timeline from command, firmware, sensors, mechanics, and controller decisions.
+5. **Share test scenarios, not only API schemas.** Define what happens during lag, partial movement, sensor contradiction, and reconnect.
+6. **Keep ownership after diagnosis.** Collaboration identifies the correct layer; it does not mean every team edits every component.
+
+## Practices to evaluate
+
+- One shared event timeline with synchronized timestamps.
+- A cross-layer failure taxonomy.
+- Hardware-in-the-loop scenarios derived from production incidents.
+- A rule that every workaround records the physical assumption it compensates for.
+
+## Ending
+
+Good boundaries reduce the number of facts a team must know during normal operation. They must still open during failure analysis, because physics does not respect the organization chart.

@@ -1,0 +1,36 @@
+---
+title: "Architectures for coordinating warehouse robots"
+description: "Centralized, decentralized, hierarchical, and event-driven control—and why a practical system mixes them."
+pubDate: "2026-09-02"
+---
+
+<!-- Draft: rename to .md when ready to publish. -->
+
+**Thesis:** The useful architecture question is not whether control should be centralized or decentralized. It is which decisions need global knowledge, which must survive network loss locally, and where physical truth can be observed.
+
+## Architectures to compare
+
+| Architecture | Benefit | Main cost |
+|---|---|---|
+| Centralized | Global reservations and simpler conflict resolution | Larger failure domain and dependence on communication |
+| Decentralized | Fast local response and autonomy during disconnects | Hard global optimization and difficult debugging |
+| Hierarchical | Strategic control centrally, physical safety locally | Boundary rules and reconciliation become critical |
+| Event-driven | Loose coupling and easy subsystem integration | Ordering, duplicate events, and stale state |
+
+## Proposed argument
+
+Our controller is effectively hierarchical. The MFC owns tasks, shared resources, route reservations, and fleet-level recovery. Robot firmware owns motor control and immediate hardware safety. PLCs own local machinery. Reported state flows upward; commands and constraints flow downward.
+
+Explain why global route coordination remains centralized: two robots cannot independently reserve the same narrow aisle safely without a shared protocol that recreates a central authority. Explain why low-level motion cannot live in the MFC: latency and connection loss make remote motor control unsafe.
+
+## Questions to answer with incidents
+
+- Which decisions require a warehouse-wide view?
+- Which failures must a robot handle without the controller?
+- What happens after reconnect when local and central state differ?
+- Which component may stop the system, and at what scope?
+- Is the database authoritative, or only a record of the latest accepted observation?
+
+## Ending
+
+Architecture follows failure ownership. Put each decision where the required information exists and where it can still be made when adjacent components fail.

@@ -1,0 +1,32 @@
+---
+title: "Abstractions leak when robots move"
+description: "Why high-level warehouse software needs controlled access to physical ground truth."
+pubDate: "2026-09-02"
+---
+
+<!-- Draft: rename to .md when ready to publish. -->
+
+**Thesis:** Device abstractions make orchestration possible, but recovery begins where those abstractions stop matching reality. The solution is not to discard layers; it is to preserve an explicit path to raw observations.
+
+## Opening contradiction
+
+The task layer says a robot is at node A. The last command says it should be at B. Its sensors place it between them, while its body blocks the edge. Which state should the planner use?
+
+## Outline
+
+1. **Why we create abstractions.** Tasks should say “retrieve box,” not manipulate motors and sensors.
+2. **Where they leak.** Partial movement, ambiguous acknowledgements, crooked boxes, unexpected gripper states, and stale telemetry.
+3. **Desired state is not observed state.** Keep command intent, predicted state, and physical observation separate.
+4. **Expose evidence without spreading device logic.** Higher layers should see normalized observations plus raw diagnostic details when reconciliation fails.
+5. **Make uncertainty a value.** Unknown position or box ownership must not be silently converted into a plausible state.
+6. **Let safety depend on the most conservative credible state.** Business planning can wait; collision prevention cannot.
+
+## Evidence to add
+
+- A real example where a clean interface hid the fact required for recovery.
+- The smallest raw signals the controller needed to expose.
+- An example of a failed abstraction removal that coupled orchestration too tightly to one robot model.
+
+## Ending
+
+An abstraction is useful while it compresses reality without removing facts needed for safety and recovery. Beyond that point it is concealment.

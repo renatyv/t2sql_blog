@@ -1,0 +1,32 @@
+---
+title: "The most dangerous state is ‘probably’"
+description: "What a warehouse controller does when it cannot know whether a robot command completed."
+pubDate: "2026-09-02"
+---
+
+<!-- Draft: rename to .md when ready to publish. -->
+
+**Thesis:** Distributed software often treats timeout as failure. In a physical system, timeout means uncertainty: the command may not have started, may be executing, or may have completed without acknowledgement.
+
+## Opening scenario
+
+The controller sends `MOVE`, then loses the connection. Retrying blindly could move the robot twice. Rolling back the database could make another robot enter occupied space. Declaring success could advance a box workflow that never happened.
+
+## Outline
+
+1. **Enumerate the possible histories.** Not received, received but queued, partially executed, completed, or completed with a lost response.
+2. **Separate transport acknowledgement from physical completion.** Neither proves the other.
+3. **Make commands identifiable.** Use command IDs and reported execution state to recognize duplicates and late responses.
+4. **Reserve for uncertainty.** Until position is established, block every area the robot could credibly occupy.
+5. **Recover to a known state.** Reconnect, stop, inspect sensors, and move to a reference position before ordinary planning resumes.
+6. **Treat box actions more carefully than movement.** A partial take or put can change inventory truth as well as robot position.
+
+## Evidence to add
+
+- An execution-lost-stop-ack incident.
+- A command that completed after its caller timed out.
+- The difference between recovery after MOVE and after TAKE/PUT.
+
+## Ending
+
+Exactly-once execution is not a network promise the controller can make to a motor. It is a physical fact that must be observed or safely reconstructed.

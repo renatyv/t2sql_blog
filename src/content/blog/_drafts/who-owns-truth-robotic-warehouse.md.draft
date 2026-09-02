@@ -1,0 +1,32 @@
+---
+title: "Who owns the truth in a robotic warehouse?"
+description: "How databases, controllers, robots, PLCs, sensors, and operators develop conflicting versions of reality."
+pubDate: "2026-09-02"
+---
+
+<!-- Draft: rename to .md when ready to publish. -->
+
+**Thesis:** No component owns all physical truth. Reliable control comes from defining authority per fact and providing reconciliation when authoritative sources disagree or disappear.
+
+## Opening scenario
+
+The database assigns a box to a stack. The robot reports a full gripper. The port sensor sees no box. An operator can see the box hanging between the robot and the stack. Every subsystem is internally consistent and the warehouse is still wrong.
+
+## Proposed structure
+
+1. **List the competing truths.** Desired task state, scheduled command, robot telemetry, PLC state, sensor readings, inventory records, and operator observations.
+2. **Assign authority by fact.** A controller may own task intent; a robot sensor may own gripper state; neither alone can prove box identity and location.
+3. **Track provenance and freshness.** “Robot at X” needs an observation time and source.
+4. **Do not overwrite disagreement.** Preserve conflicting evidence long enough to diagnose and recover.
+5. **Reconcile through safe experiments.** Stop motion, reread RFID, retract the gripper, move to a known marker, or ask an operator.
+6. **Update durable state only after evidence crosses a confidence boundary.** Avoid recording the intended result merely because a command was sent.
+
+## Evidence to add
+
+- RFID mismatch and box-position recovery examples.
+- A stale telemetry incident.
+- A table assigning authority for robot position, box identity, gripper occupancy, port readiness, and task completion.
+
+## Ending
+
+The source of truth is not a server. It is a rule for choosing among observations under specific failure conditions.
