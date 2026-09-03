@@ -1,0 +1,91 @@
+---
+title: "How I Put an AI Near a Live Robot Warehouse Without Giving It Full Control"
+description: "Why I built a natural-language robot task assistant, how it fits into the warehouse, and how I cage it away from direct control."
+pubDate: "2026-09-04"
+---
+
+import { Image } from 'astro:assets';
+import assistantClarification from '../../assets/ai-assistant-screen-1.png';
+import assistantPlan from '../../assets/ai-assistant-screen-2.png';
+import robotHandlingContainer from '../../assets/volume-dive-robot-handling-container.png';
+import robotOnGrid from '../../assets/volume-dive-robot-on-grid.png';
+
+**TL;DR:** I added an LLM to the warehouse UI because natural language is useful for expressing operator intent. I did not add it to the robot control loop. The model can inspect selected warehouse data and propose high-level tasks, but ordinary deterministic software restricts what it can request, shows every write to an operator, and executes only after confirmation. The model suggests; the existing warehouse controller remains in charge.
+
+## The warehouse
+
+[Volume DIVE](https://volume.eu/en/warehouse-automation-company/container-warehouse/) stores containers in stacks surrounded by a rail grid. Small mobile robots called **Snappers** move the containers between storage and operator ports.
+
+<div class="warehouse-overview">
+
+<figure>
+  <Image
+    src={robotOnGrid}
+    width={600}
+    alt="A Volume DIVE robot traveling on rails around container stacks"
+  />
+  <figcaption><strong>The warehouse.</strong> Robots share a dense rail grid around the storage stacks.</figcaption>
+</figure>
+
+<figure>
+  <Image
+    src={robotHandlingContainer}
+    width={600}
+    alt="A Volume DIVE robot reaching sideways to handle a container"
+  />
+  <figcaption><strong>Handling a container.</strong> The robot reaches into a neighboring stack while its base remains on the rails.</figcaption>
+</figure>
+
+</div>
+
+The **Material Flow Controller**, or MFC, coordinates the shared grid. It tracks inventory, creates tasks, assigns robots, and plans routes. Robot firmware owns motor control and immediate hardware safety. The AI assistant is a custom chat window MFC's user-facing web page: it processes high-level tasks but does not control hardware.
+
+## Why add an AI at all?
+
+<figure>
+  <Image
+    src={assistantClarification}
+    width={900}
+    alt="The assistant reports a successful read-only boxes request and asks where to move the boxes from stack 5,1"
+  />
+  <figcaption><strong>Read first, ask when needed.</strong> The assistant inspects the stack through an allowed GET request, then asks the operator to resolve the missing destination.</figcaption>
+</figure>
+
+A large language model is a perfect translator to a machine: inspect the relevant warehouse state, select the containers, construct requests, and explain the resulting plan.
+
+I do not (yet) use an LLM for route planning, collision avoidance, task recovery, or firmware. Those layers depend on explicit state and predictable rules. A plausible but wrong paragraph is annoying; a plausible but wrong movement in a live warehouse can damage a container, block other robots, or endanger someone servicing the system.
+
+<figure>
+  <Image
+    src={assistantPlan}
+    width={900}
+    alt="Plan preview listing 11 box movements with cancel, regenerate, and execute controls"
+  />
+  <figcaption><strong>The write boundary.</strong> All 11 proposed movements remain pending until the operator chooses to execute them.</figcaption>
+</figure>
+
+Once the intent is clear, every proposed change appears in a reviewable plan. Nothing moves until the operator confirms it.
+
+## Why the browser is the cage
+
+The assistant lives inside the existing warehouse UI. This avoids backend and MFC changes, requires no MCP server, and gives the operator a place to review every proposed action. Operators keep their existing permissions and can choose any supported provider, including local Ollama, OpenAI, Anthropic, or OpenRouter.
+
+### 1. Credentials stay separate
+
+MFC authentication remains in the UI request layer and never enters the model prompt. The provider receives the operator's request and selected warehouse context, but no credential that can call the warehouse backend. Its own API key is stored separately in the browser and used only for model requests.
+
+### 2. Capabilities are allowlisted
+
+The UI accepts only a fixed set of high-level operations. Reads cover data such as executor status, robot and port states, tasks, containers, grid dimensions, and failed-action diagnostics. Writes are limited to selected task and configuration endpoints.
+
+Low-level motor, gripper, and raw robot commands are excluded. Allowed writes still create MFC tasks, so the controller plans and validates the physical work. The UI checks the allowlist after every model response; mentioning another endpoint in JSON does not grant access to it.
+
+### 3. Reads are automatic; writes are reviewed
+
+The UI may run approved read-only requests automatically, returning results to the model for up to three iterations. Every `POST`, however, becomes a visible plan with a plain-language summary, endpoint, and JSON body.
+
+The operator must approve that exact plan before it reaches the MFC. Plans above 100 writes require an extra confirmation. This catches ambiguous instructions that can produce valid requests with the wrong intent.
+
+### 4. Execution stops on the first error
+
+Approved writes run sequentially. If one fails, the rest are blocked rather than executed against an unexpected warehouse state. The result appears in the chat, where the model can explain the failure or propose a new plan.
