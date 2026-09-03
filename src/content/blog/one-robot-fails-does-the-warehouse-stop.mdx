@@ -22,7 +22,7 @@ A robotic warehouse shouldn’t stop working just because one robot does. After 
 
 ## Motivation
 
-Reliability and error handling becomes the largest issue we deal with. I counted commits whose subject explicitly contained failure vocabulary such as *recovery*, *failed*, *timeout*, *alarm*, *N_RDY*, *NOT_IN_USE*, *RFID*, *mismatch*, *ACK*, or *exception*. It is a rough proxy, but the trend is there:
+Reliability and error handling becomes the largest issue we deal with. I counted software changes whose subject explicitly contained failure vocabulary such as *recovery*, *failed*, *timeout*, *alarm*, *N_RDY*, *NOT_IN_USE*, *RFID*, *mismatch*, *ACK*, or *exception*. It is a rough proxy, but the trend is there:
 
 | Year |  Share |
 | --- |  ---: |
@@ -31,6 +31,8 @@ Reliability and error handling becomes the largest issue we deal with. I counted
 | 2024 | 7.6% |
 | 2025 | 11.3% |
 | 2026 through September 2 | 27.3% |
+
+Reliability is not a finishing pass, it is a large part of the product.
 
 ## The warehouse
 
@@ -60,16 +62,11 @@ Reliability and error handling becomes the largest issue we deal with. I counted
 
 Each robot can drive in two directions on the rails, rotate its gripper tower, and extend the gripper. Because several robots share the same dense grid, any machine that stops or does something unexpected instantly becomes a physical obstacle for everyone nearby.
 
-Picture this: a robot accepts a move, enters an intersection, and hangs in wrong state. You can’t just mark the task as failed. The robot is still sitting in physical space, it might still be rolling, its gripper may be extended into a stack, and it may now be blocking the paths of several other robots.
-
 That’s the core recovery problem. The controller’s records say what *should* have happened; safety depends on what *actually* happened. We learned to handle it in three steps:
 
 1. Establish the robot’s real physical state and inspect all reported errors.
 2. Contain the area whose safety is now uncertain.
 3. Escalate only as far as necessary until the warehouse can continue operation.
-
-
-Reliability is not a finishing pass, it becomes a large part of the product.
 
 ## 1. Establish the physical state
 
@@ -78,16 +75,23 @@ In pure software you can often just retry a failed operation. A robot command ch
 We saw failures at many places:
 
 - **Motion** — robot stopped between cells, ignored a command, or could no longer steer properly because a clutch loosened or a belt stretched.  
-- **Mechanics** — wires broke, motors overheated, batteries died, containers got damaged or sat crooked in a stack.  
+- **Mechanics** — wires broke, motors overheated, batteries died, containers deforemed and got damaged or sat crooked in a stack.  
 - **State and identity** — operator scanned the wrong container, robot was holding something different from what the controller expected, or an unregistered test robot suddenly appeared on the grid.  
 - **Communication** — a connection dropped while the controller still needed to know whether the robot had stopped.
 - **Environment** — loose hardware landed on the rails or someone hit the emergency-stop button.
+- **Delays**
 
-And more often than not, we see a combination of those. A disconnected robot might be stationary or still rolling. A stopped robot might be safely centered on an intersection or stranded between two cells. It might be holding a container with the gripper stuck out. Each case needs a different recovery action.
+**How we detect problems**
+Each robot has built-in chip, which monitors continuously the hardware state, process, filter it and send to the higher-level software controller. We call it Material Flow Controller (MFC), which is responsible for routing robots and delivering boxes.
 
-Not every delay is a failure, either. At a port an operator might still be working with a container. A known delay can keep going; a lost message, wrong container, or abandoned operation creates an unknown state that has to be sorted out first.
+The MFC
+1. Reads constantly the raw sensor values (wheel and lift encoders, positioning sensors, switches,...), as well as pre-processed data (position on grid, RFID reading,...) from the robot
+2. Compares the received state to the expected, planned one
 
-A failed cell-to-cell drive mostly creates uncertainty about a robot position. A failed TAKE or PUT creates uncertainty about both a robot and a container(!): is the box still on the stack, inside the gripper, or somewhere between those two facts? RFID looked like an easy answer until we saw hardware failing, in particular the RFID sensors giving the wrong box numbers.
+This allows to 
+- Detect when something went wrong as soon as possible
+- Gather statistics, to predict robot maintnence
+- Check if hardware improvements made an impact or not
 
 ## 2. Contain the uncertainty
 
@@ -96,6 +100,8 @@ Robots share a dense rail grid. When one stops, its failure changes the safe ope
 So the software blocks the uncertain robot’s physical area before it tries any recovery. For a failed motion, it preserves the action’s swept reservation—not merely the robot’s last reported cell. For an idle  robot, it reserves the space occupied by its current body and gripper pose far into the future. Other robots can keep working outside that zone as long as a safe route still exists.
 
 This matters even more when a robot simply takes longer than expected. You can’t release its reserved space just because the planned reservation expired. The controller has to confirm that the robot actually moved far enough; otherwise the occupied area stays blocked.
+
+All box robot's tasks get replanned. The environment changed, the delivery order and robot-to-task mapping is different now.
 
 ## 3. Escalate only as far as necessary
 
