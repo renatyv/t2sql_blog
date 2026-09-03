@@ -1,5 +1,5 @@
 ---
-title: "One Robot Fails. Does the Warehouse Stop?"
+title: "One Robot Fails. The Warehouse Shouldn't."
 description: "How a robotic warehouse contains failures, recovers uncertain state, and keeps unaffected robots working."
 pubDate: "2026-09-02"
 ---
@@ -18,11 +18,11 @@ import robotOnGrid from '../../assets/volume-dive-robot-on-grid.png';
 </figure>
 
 **TL;DR**  
-A robotic warehouse shouldn’t stop working just because one robot does. After a failure, the controller has to establish what the robot is physically doing, contain the uncertain area, and escalate only as far as necessary. Sometimes that means one automatic command. Sometimes it means parking the robot as *unusable*.
+A robotic warehouse shouldn’t stop working just because one robot does. After a failure, the software has to establish what the robot is physically doing, contain the uncertain area, and escalate only as far as necessary. Sometimes that means one automatic command. Sometimes it means parking the robot as *unusable*.
 
 ## Motivation
 
-Is reliability and error handling even worth discussing? I counted commits whose subject explicitly contained failure vocabulary such as *recovery*, *failed*, *timeout*, *alarm*, *N_RDY*, *NOT_IN_USE*, *RFID*, *mismatch*, *ACK*, or *exception*. It is a rough proxy, but the trend is hard to miss:
+Reliability and error handling becomes the largest issue we deal with. I counted commits whose subject explicitly contained failure vocabulary such as *recovery*, *failed*, *timeout*, *alarm*, *N_RDY*, *NOT_IN_USE*, *RFID*, *mismatch*, *ACK*, or *exception*. It is a rough proxy, but the trend is there:
 
 | Year |  Share |
 | --- |  ---: |
@@ -31,8 +31,6 @@ Is reliability and error handling even worth discussing? I counted commits whose
 | 2024 | 7.6% |
 | 2025 | 11.3% |
 | 2026 through September 2 | 27.3% |
-
-For the last months most of what I was doing is error-handling. Software, hardware, and human errors.
 
 ## The warehouse
 
@@ -60,7 +58,7 @@ For the last months most of what I was doing is error-handling. Software, hardwa
 
 </div>
 
-Each robot can drive in two directions on the rails, rotate its gripper tower, and stretch the gripper past its own body. Because several robots share the same dense grid, any machine that stops or does something unexpected instantly becomes a physical obstacle for everyone nearby.
+Each robot can drive in two directions on the rails, rotate its gripper tower, and extend the gripper. Because several robots share the same dense grid, any machine that stops or does something unexpected instantly becomes a physical obstacle for everyone nearby.
 
 Picture this: a robot accepts a move, enters an intersection, and hangs in wrong state. You can’t just mark the task as failed. The robot is still sitting in physical space, it might still be rolling, its gripper may be extended into a stack, and it may now be blocking the paths of several other robots.
 

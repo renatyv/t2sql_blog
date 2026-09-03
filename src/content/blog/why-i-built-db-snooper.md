@@ -1,5 +1,5 @@
 ---
-title: "Why I built database profiler, db-snooper"
+title: "A Database Profile Is a Retrieval Artifact, Not a Dump"
 description: "A compact database profile for SQL agents—and the mistakes that made it useful."
 pubDate: "2026-08-27"
 ---

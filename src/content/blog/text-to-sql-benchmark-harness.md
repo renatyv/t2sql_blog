@@ -1,5 +1,5 @@
 ---
-title: "Four evaluation bugs that make a text-to-SQL pipeline look broken"
+title: "Four Harness Bugs That Made a Working Agent Look Broken"
 description: "Four small harness decisions that can make a working text-to-SQL agent look broken."
 pubDate: "2026-08-24"
 ---

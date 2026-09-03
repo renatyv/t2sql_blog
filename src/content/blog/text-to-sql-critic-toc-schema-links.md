@@ -1,5 +1,5 @@
 ---
-title: "Text-to-SQL ablations: reasoning, retrieval, and critics"
+title: "You're Better Off With No Reasoning and No Critic Sub-Agent"
 description: "A SQL critic, profile retrieval, and reasoning-effort ablations on 498 BIRD Mini-Dev questions."
 pubDate: "2026-08-26"
 ---

@@ -1,5 +1,5 @@
 ---
-title: "A database profile changed text-to-SQL cost—not accuracy"
+title: "Your SQL Agent Doesn't Need a Database Profile"
 description: "A three-arm BEAVER benchmark of raw database access, a full profile, and compact metadata."
 pubDate: "2026-08-15"
 ---
