@@ -4,9 +4,9 @@ description: "A three-arm BEAVER benchmark of raw database access, a full profil
 pubDate: "2026-08-15"
 ---
 
-**Main result.** Claude, Codex, and the [pi coding agent](https://pi.dev/) don't need an upfront summary of the tables in your database to extract data or answer questions. In my experiments, the full summary used **6× more input tokens** and made the agent explore the database 83% less often.
+**Main result.** The coding agents ([pi coding agent](https://pi.dev/) or cluade or codex) don't need an upfront summary of the tables in your database to extract data or answer questions. In my experiments, the full summary used **6× more input tokens** and made the agent explore the database 83% less often.
 
-## Proof
+## Experiment
 
 I expected pre-generated metadata to save the agent (Claude, Codex, or [pi](https://pi.dev/)) from rediscovering tables, joins, data types, and values. Winners of the well-known text-to-SQL benchmark [BIRD](https://bird-bench.github.io/) [recommend](https://arxiv.org/abs/2505.19988) generating a so-called 'profile', i.e. a summary of every table: column names, types, examples, etc.
 
@@ -24,11 +24,11 @@ The question was simple: **does extra database context help a coding agent produ
 2. The profile made the agent cheaper in database calls but far more expensive in prompt tokens.
 3. Compact metadata matched raw access at 27/300, but did not beat it.
 
-## 1. The full profile did not improve accuracy
+### 1. The full profile did not improve accuracy
 
-**Dataset.** I used data from one of the latest text-to-SQL benchmarks, [BEAVER](https://beaverbench.github.io/#overview). It consists of three complete MySQL database dumps called 'neutron', 'nova', and 'dw'. The benchmark also provides many pairs of textual requests ('Give me the highest paid employee') and corresponding 'gold' queries ('SELECT user.name, MAX(salary) FROM ...'). Some queries are extremely difficult, spanning tens of tables with complicated grouping and subqueries. These queries have been verified as correct by real experts.
+**Dataset.** I used data from one of the latest text-to-SQL benchmarks, [BEAVER](https://beaverbench.github.io/#overview). It consists of three complete MySQL database dumps called 'neutron', 'nova', and 'dw'. The benchmark also provides many pairs of textual requests ('Give me the highest paid employee') and corresponding 'gold' queries ('SELECT user.name, MAX(salary) FROM ...'). Some queries are extremely difficult, spanning tens of tables with complicated grouping and subqueries. According to BEAVER authors, the golden queries have been verified as correct by real experts. The sample spans all kinds of queries: easy, medium, requiring domain knowledge and others. Evenly distributed across all 3 databases: nova, neutron, and dw. 
 
-I gave 300 random questions to all three variants (raw access, raw + profile, raw + metadata) of the agent, 100 for each database (nova, neutron, dw).
+#### Results
 
 **Execution accuracy:** whether the generated SQL returned the same result as the reference query.
 
@@ -52,9 +52,9 @@ The profile produced no aggregate gain.
 
 The agent read the profile, asked fewer questions, and reached the wrong answer faster. On the largest database, the profile text alone added about nine times the raw-access arm's input-token volume per run.
 
-## Compact metadata matched raw access, but did not beat it
+## Side quest: compact metadata
 
-Maybe the full profile was simply too much context. I added a third arm with a brief 20–50-line summary generated from the profile and schema-linker. The same coding agent generated each summary in the same sandbox, with no access to benchmark questions or answers. The summaries clarified semantics and potential join strategies, including predicates and cardinality caveats.
+Maybe the full profile was simply too much context? Indeed, the profile size was about 200kb for 'dw' database. So, the obviouse idea is to summarize it with a brief 20–50-line file, generated from the full profile and schema-linker outputs. The same coding agent generated each summary, with no access to benchmark questions or answers, or the internet to prevent leaking sensible gld queries or domain info. The summaries clarified semantics and potential join strategies, including predicates and cardinality caveats.
 
 **Results**
 
@@ -67,17 +67,11 @@ Maybe the full profile was simply too much context. I added a third arm with a b
 
 Compact metadata changed which questions the agent answered correctly, but not aggregate accuracy. The per-database differences are only a few questions and are descriptive, not evidence of improvement. The harness also has a fourth arm combining the full profile and metadata, but the headline run used three.
 
-## How I tested
+## Preventing AI from cheating
 
-The BEAVER benchmark is public, so anyone can see the correct 'gold' SQL queries for the questions in the dataset. Hell, they are in the benchmark repository itself!
+The BEAVER benchmark is public, so anyone can see the correct 'gold' SQL queries for the questions in the dataset. Hell, they are in the benchmark repository itself! To isolate the AI agent I used a fresh Docker container per question with a `SELECT`-only database account, and network access limited to the database and OpenRouter. This prevented AI from looking up answers locally, on the internet or leaking sensitive information from one question to another.
 
-- Three MySQL dumps from BEAVER: 'neutron', 'nova', and 'dw'.
-- 100 fixed-seed questions per database.
-- [pi coding agent](https://pi.dev/) with GPT-5.6 Luna PRO via OpenRouter at medium effort.
-- A fresh Docker container per question, a `SELECT`-only database account, and network access limited to the database and OpenRouter. This prevents the agent from looking up answers locally or leaking information from one question to another.
 
-I also found four harness problems—an implicit context limit, leaked `LIMIT 5`, truncated query output, and runs that ended without SQL. I describe the fixes in [Four Benchmark Settings That Can Distort a SQL Agent Test](/blog/text-to-sql-benchmark-harness/).
+## Technical information
 
-The implementation is in the [GitHub repository](https://github.com/renatyv/text2sql).
-
-**Conclusion:** raw database access remained the simplest option and matched or beat both kinds of pre-generated context. Use a profile only when a different constraint—such as fewer live database calls—matters enough to justify it.
+1. The benchmark implementation is in the [GitHub repository](https://github.com/renatyv/text2sql). Prompts are assembled in [prompts.py](https://github.com/renatyv/text2sql/blob/main/harness/prompts.py).
