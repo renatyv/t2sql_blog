@@ -1,79 +1,75 @@
 ---
-title: "Your SQL Agent Doesn't Need a Database Profile"
+title: "Your SQL Agent Doesn't Need a Database Summary"
 description: "A three-arm BEAVER benchmark of raw database access, a full profile, and compact metadata."
 pubDate: "2026-08-15"
 ---
 
-**Results**
-1) A full database profile did not improve execution accuracy: 25/300 correct versus 27/300 with raw database access.
-2) The full profile used about 6× more input tokens and made the agent query the database 83% less often.
-3) Compact metadata matched raw database access at 27/300 correct.
+**TL;DR:** Start a SQL agent with direct database access. In this experiment, neither a full database profile nor compact metadata improved execution accuracy. The full profile also used about 6× more input tokens and made the agent explore the database 83% less often.
 
-**Experiment:** 300 seed-fixed [BEAVER](https://huggingface.co/datasets/BeaverBench/beaver) questions per arm: 100 each from neutron, nova, and dw. The primary metric is **execution accuracy**: the share of generated SQL queries whose result matches the gold query. Higher is better.
+I expected pre-generated metadata to save the agent from rediscovering tables, joins, data types, and values. [BIRD](https://bird-bench.github.io/) winners [recommend this approach](https://arxiv.org/abs/2505.19988), so I tested three ways of giving the agent database context:
 
-I compared three ways to give the coding agent database context:
+1. **Raw database access:** the agent received no pre-generated metadata and explored the database with SQL.
+2. **Full profile:** the agent received the complete db-snooper report in every context, including schemas, indexes, relationships, value distributions, and sample rows.
+3. **Compact metadata:** the agent received a 26–43-line summary generated from the full profile and schema links. It kept clarified semantics and likely join strategies while omitting most profile detail.
 
-1. Direct access to the raw database.
-2. A full pre-generated database profile, as [BIRD](https://bird-bench.github.io/) winners [recommend](https://arxiv.org/abs/2505.19988).
-3. Compact metadata derived from the profile and schema links.
+The question was simple: **does extra database context help a coding agent produce more correct SQL?** In this setup, the answer was no. Three results support that conclusion:
 
-BEAVER's reference setup differs: it uses hand-coded Python agents, turns reasoning off, and pre-retrieves and reranks tables (Qwen embedding top 50, reranker top 15).
+1. A full profile scored 25/300, versus 27/300 with raw database access.
+2. The profile made the agent cheaper in database calls but far more expensive in prompt tokens.
+3. Compact metadata matched raw access at 27/300, but did not beat it.
 
-## Results at a glance
+## 1. The full profile did not improve accuracy
 
-| Database | Raw DB access | Full profile | Change | What it means |
-|---|---:|---:|---:|---|
-| neutron | 13/100 (13%) | 13/100 (13%) | 0 pp | No change |
-| nova | 9/100 (9%) | 8/100 (8%) | −1 pp | No improvement |
-| dw | 5/100 (5%) | 4/100 (4%) | −1 pp | No improvement |
-| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **−0.7 pp** | **No aggregate gain** |
+BEAVER is the benchmark dataset; `neutron`, `nova`, and `dw` are three MySQL databases included in it. I gave the agent 300 seed-fixed questions per arm—100 questions associated with each database. The primary metric was **execution accuracy**—whether the generated SQL returned the same result as the reference query.
 
-The profile changed cost and behavior, not correctness:
+| Database | Raw DB access | Full profile | Change |
+|---|---:|---:|---:|
+| neutron | 13/100 (13%) | 13/100 (13%) | 0 pp |
+| nova | 9/100 (9%) | 8/100 (8%) | −1 pp |
+| dw | 5/100 (5%) | 4/100 (4%) | −1 pp |
+| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **−0.7 pp** |
 
-| Metric | Raw DB access | Full profile | Change | What it means |
-|---|---:|---:|---:|---|
-| Execution accuracy ↑ | 27/300 (9.0%) | 25/300 (8.3%) | −0.7 pp | No improvement |
-| Input tokens/question ↓ | 1× baseline | about 6× | about +500% | Much larger prompts |
-| Turns/question ↓ | 4.6 | 2.2 | −52% | The agent stopped sooner |
-| DB queries/question ↓ | 7.8 | 1.3 | −83% | The agent explored less |
+The profile produced no aggregate gain. BEAVER's reference setup is different: it uses hand-coded Python agents, disables reasoning, and pre-retrieves and reranks tables with Qwen embeddings (top 50) and a reranker (top 15).
 
-<p class="result-note"><strong>Bottom line:</strong> the agent read the profile, asked fewer questions, and reached the wrong answer faster.</p>
+## 2. The profile changed cost and behavior, not correctness
 
-The full profile was included in every context. On the largest database, the profile text alone added about nine times the direct-access arm's input-token volume per run.
+| Metric | Raw DB access | Full profile | Change |
+|---|---:|---:|---:|
+| Execution accuracy ↑ | 27/300 (9.0%) | 25/300 (8.3%) | −0.7 pp |
+| Input tokens/question ↓ | 1× baseline | about 6× | about +500% |
+| Turns/question ↓ | 4.6 | 2.2 | −52% |
+| DB queries/question ↓ | 7.8 | 1.3 | −83% |
 
-### How I tested
+The agent read the profile, asked fewer questions, and reached the wrong answer faster. On the largest database, the profile text alone added about nine times the raw-access arm's input-token volume per run.
 
-[GitHub repo](https://github.com/renatyv/text2sql)
+## 3. Compact metadata matched raw access, but did not beat it
 
-- Three MySQL database dumps from [BEAVER benchmark](https://huggingface.co/datasets/BeaverBench/beaver): neutron, nova, dw
-- 100 questions per database per arm, using a seed-fixed sample. I measured execution accuracy against the gold results.
-- pi coding agent with GPT-5.6 Luna PRO via OpenRouter at medium effort
-- A fresh Docker container per question, with a SELECT-only database account and access only to the database and OpenRouter endpoint
-- At most 15 turns per query
+Maybe the full profile was simply too much context. I added a third arm with a 26–43-line summary generated from two artifacts:
 
-### The third arm: metadata instead of the full profile
+- A [db-snooper](https://github.com/renatyv/db-snooper) profile containing schema, indexes, foreign keys, inferred relationships, value distributions, and samples.
+- [Schema links](https://github.com/renatyv/schema-linker) containing declared foreign keys and same-name join candidates, grouped into declared and inferred paths.
 
-| Database | Raw DB access | Full profile | Compact metadata | Metadata change vs raw |
+The same coding agent generated each summary in the same sandbox, with no access to benchmark questions or answers. The files described clarified semantics and potential join strategies, including predicates and cardinality caveats.
+
+| Database | Raw DB access | Full profile | Compact metadata | Metadata vs raw |
 |---|---:|---:|---:|---:|
 | neutron | 13/100 (13%) | 13/100 (13%) | 13/100 (13%) | 0 pp |
 | nova | 9/100 (9%) | 8/100 (8%) | 11/100 (11%) | +2 pp |
 | dw | 5/100 (5%) | 4/100 (4%) | 3/100 (3%) | −2 pp |
 | **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **27/300 (9.0%)** | **0 pp** |
 
-Maybe the full profile is simply too much context. For a third arm, I gave the agent a compact summary built from the profile and schema links. It matched raw access overall, but the per-database movements were only a few questions and are descriptive, not evidence of an improvement.
+Compact metadata changed which questions the agent answered correctly, but not aggregate accuracy. The per-database differences are only a few questions and are descriptive, not evidence of improvement. The harness also has a fourth arm combining the full profile and metadata, but the headline run used three.
 
-The same coding agent generated that metadata in the same sandbox from two artifacts:
+## How I tested
 
-1. **The [db-snooper](https://github.com/renatyv/db-snooper) profile** — against MySQL produces per-table schema (columns, types, indexes, FKs), inferred relationships, per-column value distributions, and sample rows.
-2. **[Schema links](https://github.com/renatyv/schema-linker)** — deterministic linking hints: declared foreign keys from `information_schema` plus same-name column candidates (excluding noise like `id`, `created_at`), grouped into "declared" vs "inferred" join paths.
+The implementation is in the [GitHub repository](https://github.com/renatyv/text2sql).
 
-A one-off pi agent run—using the same Docker isolation and SELECT-only account, with no access to benchmark questions or answers—read both files and wrote a short `<db>.md`. It contained **Clarified Semantics** and **Potential Join Strategies**, including join predicates and cardinality caveats. That 26–43-line file was the input for the `metadata` arm. The harness also has a fourth arm with both the profile and metadata, but the headline run used three.
+- Three MySQL dumps from BEAVER: `neutron`, `nova`, and `dw`.
+- 100 seed-fixed questions per database per arm.
+- pi coding agent with GPT-5.6 Luna PRO via OpenRouter at medium effort.
+- A fresh Docker container per question, a `SELECT`-only database account, and network access limited to the database and OpenRouter.
+- At most 15 turns per question.
 
-<p class="result-note"><strong>Verdict:</strong> compact metadata changed which questions the agent answered correctly, but not aggregate accuracy. Raw database access remained the simplest option.</p>
+I also found four harness problems—an implicit context limit, leaked `LIMIT 5`, truncated query output, and runs that ended without SQL. I describe the fixes in [Four Benchmark Settings That Can Distort a SQL Agent Test](/blog/text-to-sql-benchmark-harness/).
 
-### Pitfalls and bad ideas encountered
-
-- pi silently defaults to a 128k context window for unknown models.
-- Do not tell the agent to add `LIMIT 5` to exploratory queries. It may append that limit to its final SQL, which tanks execution accuracy.
-- Do not cap queries at 100 rows. Some BEAVER gold queries return thousands of rows.
-- The agents sometimes never returned SQL. Reserving the final turn for the answer, with a reminder on the penultimate turn, fixed it.
+**Conclusion:** raw database access remained the simplest option and matched or beat both kinds of pre-generated context. Use a profile only when a different constraint—such as fewer live database calls—matters enough to justify it.

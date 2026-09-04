@@ -4,21 +4,35 @@ description: "A compact map of missing database joins for SQL agents—and the f
 pubDate: "2026-08-27"
 ---
 
-**TL;DR:** [schema-linker](https://github.com/renatyv/schema-linker) finds relationships that exist in the data but are missing from the database constraints. It writes a compact Markdown map for SQL agents. The hard part was rejecting joins that looked convincing but were wrong.
+**TL;DR:** [schema-linker](https://github.com/renatyv/schema-linker) finds join paths that exist in the data but are absent from database constraints. It treats every inferred relationship as a candidate: names propose it, several independent signals support it, and exact value containment verifies it.
 
-## Why I created it
+Text-to-SQL often fails before the SQL becomes complicated. The agent chooses the wrong tables or invents a join because real databases have incomplete foreign keys. For example, `support_tickets.customer_id` may refer to `customers.customer_id` without a declared constraint.
 
-Text-to-SQL often fails before the SQL becomes complicated: it chooses the wrong tables or invents a join. Foreign keys help, but real databases have incomplete constraints. `support_tickets.customer_id` may refer to `customers.customer_id` without the database saying so.
+The challenge is that shared names or values can also create convincing nonsense. I built schema-linker to answer one question: **how can an agent discover missing joins without mistaking coincidence for structure?** The answer has three parts:
 
-The project was inspired by the paper [*Automatic Metadata Extraction for Text-to-SQL*](https://arxiv.org/abs/2505.19988). Its central idea—that understanding database contents is often harder than writing the query—led me to treat missing join paths as metadata that could be extracted automatically.
+1. Narrow candidates with cheap structural signals.
+2. Verify direction against actual values.
+3. Present related columns as one compact domain, not a noisy list of pairs.
 
-Models and agent harnesses will keep improving, so prompt tricks such as critics, rankers, and parallel candidate generation may be automated away or become irrelevant. Deterministic join discovery should remain useful regardless of which model consumes its output.
+## 1. Use names to nominate, not prove
 
-I wanted to discover these missing relationships once and give them to an agent as reusable context. The same file helps with multi-table queries, unfamiliar databases, join debugging, and legacy-schema documentation.
+The project was inspired by [*Automatic Metadata Extraction for Text-to-SQL*](https://arxiv.org/abs/2505.19988): understanding database contents is often harder than writing the query.
 
-## What it does
+schema-linker supports SQLite, PostgreSQL, MySQL, MariaDB, and DuckDB. It begins with tables, keys, types, row counts, and distinct counts, then rejects known foreign keys, incompatible types, empty columns, and near-unique text.
 
-schema-linker supports SQLite, PostgreSQL, MySQL, MariaDB, and DuckDB. It reads declared keys, infers additional join candidates, and groups columns that share a value domain:
+Names, ID shape, cardinality, and MinHash containment nominate the remaining candidates. No single signal is enough. Columns called `status`, `type`, or even `customer_id` can belong to unrelated domains.
+
+## 2. Verify directional containment exactly
+
+Parent and child columns often have very different set sizes. Every `orders.customer_id` may appear in `customers.customer_id` even when many customers have no orders, so symmetric Jaccard similarity can make a valid relationship look weak.
+
+schema-linker instead checks directional containment. MinHash and LSH Ensemble reduce the candidate set; every reported relationship must then pass an exact containment check in memory or SQL. Large sets use an anti-join rather than being loaded into memory.
+
+Small domains need an extra guard. Two unrelated flags containing `0` and `1` have perfect containment but produce a cross-product when joined. Flag pairs are rejected unless one side is a primary or unique key.
+
+## 3. Group evidence into a compact join map
+
+Pairwise output multiplies noise: four columns in one customer-ID domain can produce many redundant relationships. schema-linker groups them under a primary-key anchor:
 
 ```text
 ### customers.customer_id
@@ -26,28 +40,8 @@ schema-linker supports SQLite, PostgreSQL, MySQL, MariaDB, and DuckDB. It reads 
 - declared: orders.customer_id
 ```
 
-The declared link gives context; the inferred link is the new signal. It remains a candidate because shared values do not prove shared business meaning. Detailed evidence and declared-link sections are available when debugging but omitted by default to save tokens.
+The declared relationship supplies context; the inferred relationship is the new signal. Detailed evidence and declared-only sections remain available for debugging but are omitted by default to save tokens. Dialect-aware quoting preserves spaces, reserved words, and case.
 
-## How it works
+The same map helps with multi-table SQL, unfamiliar databases, join debugging, and legacy-schema documentation. Query timeouts and table-size gates keep discovery bounded.
 
-The pipeline starts cheaply and spends more work only on plausible columns:
-
-1. Read tables, keys, types, row counts, and distinct counts.
-2. Drop known foreign keys, incompatible types, empty columns, and near-unique text.
-3. Generate candidates from names, ID shape, cardinality, and MinHash containment.
-4. Verify survivors with exact directional containment and require several signals.
-
-Containment is directional. Every `orders.customer_id` can appear in `customers.customer_id` even when many customers have no orders. A symmetric similarity score can make that valid relationship look weak.
-
-Large value sets are verified in SQL with an anti-join instead of being loaded into memory. Query timeouts and table-size gates keep discovery bounded.
-
-## Pitfalls that improved the output
-
-- **Matching names are not relationships.** `status`, `type`, and even `customer_id` can belong to unrelated domains. Names now nominate candidates; values, types, cardinality, and direction must support them.
-- **Jaccard was the wrong comparison.** Parent and child columns often have very different set sizes. Directional containment finds these joins without requiring both sets to be equally complete.
-- **Small domains create perfect nonsense.** Two independent flags both containing `0` and `1` have perfect containment but produce a cross-product when joined. Flag pairs are rejected unless one side is a primary or unique key.
-- **Approximation is not verification.** MinHash and LSH Ensemble cheaply find candidates, but every reported link must pass an exact containment check in memory or in SQL.
-- **Pairwise output multiplies noise.** Four columns in one customer-ID domain can produce many redundant pairs. Grouping them under one primary-key anchor turns the pairwise explosion into one readable block.
-- **The output must be valid SQL context.** Dialect-aware quoting preserves spaces, reserved words, and case. Declared links and evidence stay optional so the default file contains only the new signal.
-
-A schema-link file is a map of likely join paths, not proof. Combine weak signals, verify them against real values, and keep the output smaller than the problem it explains.
+**Conclusion:** a schema-link file is evidence about likely join paths, not proof of business meaning. Combine weak signals, verify them against real values, and keep the result smaller than the problem it explains.

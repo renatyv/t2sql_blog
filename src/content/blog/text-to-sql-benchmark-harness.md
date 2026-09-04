@@ -1,50 +1,56 @@
 ---
-title: "Four Harness Bugs That Made a Working Agent Look Broken"
-description: "Four small harness decisions that can make a working text-to-SQL agent look broken."
+title: "Four Benchmark Settings That Can Distort a SQL Agent Test"
+description: "Four easy-to-miss settings that can make a text-to-SQL agent test misleading."
 pubDate: "2026-08-24"
 ---
 
-**Results**
-1) Asking for `LIMIT 5` during exploration leaked the limit into final SQL.
-2) Capping database responses at 100 rows made correct queries fail evaluation.
-3) Letting the agent use all 15 turns for exploration produced missing answers.
-4) Relying on the model's default context window made runs unpredictable.
+**TL;DR:** A text-to-SQL benchmark is credible only if the harness lets the agent return complete SQL under explicit, reproducible limits. I found four settings that violated that rule: a leaked `LIMIT 5`, a 100-row display cap, no reserved answer turn, and an implicit 128k context window.
 
-**Experiment:** While testing whether a [database profile helps a coding agent](/blog/profiler-doesnt-help/), I observed four harness failure modes. I did not isolate a separate accuracy effect for each one. The values `5`, `100`, `15`, and `128k` below are configuration values, not accuracy results.
+I found these problems while testing whether a [database profile helps a coding agent](/blog/profiler-doesnt-help/). I used [BEAVER](https://huggingface.co/datasets/BeaverBench/beaver), where every question has a database and a reference SQL query, and **pi**, a command-line coding agent that could inspect the database and return SQL.
 
-## Results at a glance
+The goal was to measure SQL ability. The complication was that small runner conveniences could change what the agent wrote, hide data from it, or prevent an answer. I therefore made four controls explicit:
 
-| Harness decision | What broke | Score symptom | Final rule |
-|---|---|---|---|
-| Ask for `LIMIT 5` during exploration | The limit leaked into final SQL | Correct logic, incomplete result set | Do not put the limit instruction in the prompt |
-| Return at most 100 rows | Some gold queries return thousands | Correct SQL scored against truncated data | Return complete query results |
-| Allow all 15 turns for exploration | Some runs ended without SQL | Missing answer counted as failure | Reserve the last turn for SQL |
-| Rely on the model's context default | pi used 128k for unknown models | Unexpected truncation or spend | Set the context window explicitly |
+| Test setting | Failure | Control |
+|---|---|---|
+| Ask for `LIMIT 5` during exploration | The limit leaked into final SQL | Let the agent choose when to sample |
+| Show at most 100 result rows | The agent could not inspect a complete large result | Return complete results |
+| Allow 15 responses without reserving an answer | A run could end before producing SQL | Make response 15 answer-only |
+| Let pi choose the context window | It used a 128,000-token fallback | Set the value explicitly |
 
-<p class="result-note"><strong>Important:</strong> the table explains failure mechanisms, not effect sizes. The benchmark recorded the failures, but these four changes were not isolated in separate A/B runs.</p>
+The values `5`, `100`, `15`, and `128k` are configuration settings, not accuracy results. I observed these failure modes while building the runner; I did not isolate an accuracy effect for each fix.
 
-### 1. LIMIT 5 leaked to the answer
+## 1. Keep exploration hints out of the final answer
 
-I told the agent to add `LIMIT 5` to exploratory queries. The `5` was meant to keep inspection output short. The agent then appended `LIMIT 5` to some final queries, changing the result set used for execution accuracy.
+I asked the agent to add `LIMIT 5` to exploratory queries to keep output short. It sometimes copied the limit into its final SQL even when the question asked for all matching rows. The query logic could be right while the answer remained incomplete.
 
-### 2. A row cap changed the expected result
+I removed the instruction. The agent can still add a small limit when it needs a sample.
 
-I also capped database responses at 100 rows. The `100` was a transport cap, not a property of the benchmark. It made runs cheaper, but some BEAVER gold queries return thousands of rows.
+## 2. Let the agent inspect complete results
 
-### 3. The agent used every turn without returning SQL
+The database executed each query in full, but the tool showed the agent only the first 100 rows. Some BEAVER reference queries return thousands.
 
-An agent spent its full 15-turn budget inspecting tables. I reserved turn 15 for the answer and added a reminder on turn 14. The evaluator still records missing answers as failures, but the harness now gives the agent a predictable chance to finish.
+This cap did not alter BEAVER's reference answer, and the evaluator still ran the final SQL separately. It restricted what the agent could inspect. I removed the cap; exploratory queries can still use an intentional `LIMIT`.
 
-### 4. The context window was not the one I expected
+## 3. Reserve a turn for the answer
 
-pi defaults to a 128k-token context window for unknown models. That number is a fallback setting, not the model limit I intended to test.
+A **turn** is one agent response, which may contain database queries or final SQL. I allowed 15 turns per question to bound cost and runtime, but one run spent all 15 inspecting tables and never answered.
 
-### The boring harness I ended up with
+Turn 15 is now answer-only: database tools are disabled after turn 14, and the agent must return its best SQL. Missing SQL still counts as failure.
 
-- A fresh Docker container per question
-- A SELECT-only database account
-- The same seed-fixed questions for every arm
-- Complete query results
-- At most 15 turns, with the final turn reserved for SQL
-- An explicitly configured context window
-- Token, turn, and database-query counts recorded alongside accuracy
+## 4. Set the context window explicitly
+
+The **context window** covers the question, instructions, conversation, and database output. For an unrecognized model, pi assumed 128,000 tokens. That was a fallback, not a deliberate experiment setting or necessarily the model's actual limit.
+
+I now configure the window explicitly so repeated runs use the same intended limit.
+
+## The controlled harness
+
+- A new, unprivileged Docker container isolates each question. MySQL remains in a separate shared container.
+- A `SELECT`-only account can read all tables in the three BEAVER schemas—`neutron`, `nova`, and `dw`—but not other databases or MySQL system schemas.
+- Every arm receives the same seed-fixed questions.
+- Database tools return complete query results.
+- Each question gets at most 15 responses, with the last reserved for SQL.
+- The context window is explicit.
+- Accuracy, tokens, turns, database queries, cost, and runtime are recorded.
+
+**Conclusion:** benchmark the agent, not the runner. Remove accidental restrictions, make intentional limits explicit, and record enough operational data to explain the score.

@@ -10,9 +10,18 @@ import assistantPlan from '../../assets/ai-assistant-screen-2.png';
 import robotHandlingContainer from '../../assets/volume-dive-robot-handling-container.png';
 import robotOnGrid from '../../assets/volume-dive-robot-on-grid.png';
 
-**TL;DR:** I added an LLM to the warehouse UI because natural language is useful for expressing operator intent. I did not add it to the robot control loop. The model can inspect selected warehouse data and propose high-level tasks, but ordinary deterministic software restricts what it can request, shows every write to an operator, and executes only after confirmation. The model suggests; the existing warehouse controller remains in charge.
+**TL;DR:** Use an LLM to translate operator intent, not to control warehouse robots. My assistant can inspect selected warehouse data and propose high-level tasks, but deterministic software restricts its capabilities, keeps credentials out of the prompt, requires human approval for every write, and stops execution on the first error. The model suggests; the existing warehouse controller remains in charge.
 
-## The warehouse
+Natural language is useful when an operator knows the outcome they want but not the exact sequence of API requests. The same flexibility becomes a liability in route planning, collision avoidance, recovery, or motor control, where plausible but wrong output can damage equipment or endanger people.
+
+The design question was therefore: **how can I use an LLM near a live warehouse without putting it in the control loop?** Four boundaries provide the answer:
+
+1. Keep warehouse credentials separate from the model.
+2. Allowlist only high-level operations.
+3. Run reads automatically, but require approval for writes.
+4. Stop a write plan as soon as one action fails.
+
+## The system the assistant sits beside
 
 [Volume DIVE](https://volume.eu/en/warehouse-automation-company/container-warehouse/) stores containers in stacks surrounded by a rail grid. Small mobile robots called **Snappers** move the containers between storage and operator ports.
 
@@ -38,9 +47,9 @@ import robotOnGrid from '../../assets/volume-dive-robot-on-grid.png';
 
 </div>
 
-The **Material Flow Controller**, or MFC, coordinates the shared grid. It tracks inventory, creates tasks, assigns robots, and plans routes. Robot firmware owns motor control and immediate hardware safety. The AI assistant is a custom chat window MFC's user-facing web page: it processes high-level tasks but does not control hardware.
+The **Material Flow Controller**, or MFC, tracks inventory, creates tasks, assigns robots, and plans routes across the shared grid. Robot firmware owns motor control and immediate hardware safety.
 
-## Why add an AI at all?
+The assistant is a chat window inside the MFC's web UI. It inspects relevant state, selects containers, constructs high-level requests, and explains a proposed plan. It does not plan routes, avoid collisions, recover tasks, or control firmware.
 
 <figure>
   <Image
@@ -51,9 +60,21 @@ The **Material Flow Controller**, or MFC, coordinates the shared grid. It tracks
   <figcaption><strong>Read first, ask when needed.</strong> The assistant inspects the stack through an allowed GET request, then asks the operator to resolve the missing destination.</figcaption>
 </figure>
 
-A large language model is a perfect translator to a machine: inspect the relevant warehouse state, select the containers, construct requests, and explain the resulting plan.
+## 1. Warehouse credentials never reach the model
 
-I do not (yet) use an LLM for route planning, collision avoidance, task recovery, or firmware. Those layers depend on explicit state and predictable rules. A plausible but wrong paragraph is annoying; a plausible but wrong movement in a live warehouse can damage a container, block other robots, or endanger someone servicing the system.
+The assistant lives in the existing browser UI, so operators keep their existing permissions and the MFC needs no new backend or MCP server. They can use a supported provider such as local Ollama, OpenAI, Anthropic, or OpenRouter.
+
+MFC authentication stays in the UI request layer and never enters the model prompt. The provider receives the operator's request and selected warehouse context, but no credential capable of calling the warehouse backend. Its own API key is stored separately in the browser and used only for model requests.
+
+## 2. The model can request only allowlisted operations
+
+The UI accepts a fixed set of high-level operations. Reads include executor status, robot and port states, tasks, containers, grid dimensions, and failed-action diagnostics. Writes are limited to selected task and configuration endpoints.
+
+Low-level motor, gripper, and raw robot commands are excluded. Allowed writes still create MFC tasks, so the deterministic controller plans and validates the physical work. The UI checks the allowlist after every model response; mentioning another endpoint in JSON does not grant access.
+
+## 3. Reads can run automatically; writes require review
+
+The UI can run approved read-only requests automatically and return their results to the model for up to three iterations. Every `POST` becomes a visible plan containing a plain-language summary, endpoint, and JSON body.
 
 <figure>
   <Image
@@ -64,28 +85,10 @@ I do not (yet) use an LLM for route planning, collision avoidance, task recovery
   <figcaption><strong>The write boundary.</strong> All 11 proposed movements remain pending until the operator chooses to execute them.</figcaption>
 </figure>
 
-Once the intent is clear, every proposed change appears in a reviewable plan. Nothing moves until the operator confirms it.
+The operator must approve the exact plan before it reaches the MFC. Plans above 100 writes require another confirmation. This boundary catches ambiguous instructions that produce valid requests with the wrong intent.
 
-## Why the browser is the cage
+## 4. A failed write stops the plan
 
-The assistant lives inside the existing warehouse UI. This avoids backend and MFC changes, requires no MCP server, and gives the operator a place to review every proposed action. Operators keep their existing permissions and can choose any supported provider, including local Ollama, OpenAI, Anthropic, or OpenRouter.
+Approved writes run sequentially. If one fails, the remaining writes are blocked rather than executed against an unexpected warehouse state. The result returns to the chat, where the model can explain the failure or propose a revised plan.
 
-### 1. Credentials stay separate
-
-MFC authentication remains in the UI request layer and never enters the model prompt. The provider receives the operator's request and selected warehouse context, but no credential that can call the warehouse backend. Its own API key is stored separately in the browser and used only for model requests.
-
-### 2. Capabilities are allowlisted
-
-The UI accepts only a fixed set of high-level operations. Reads cover data such as executor status, robot and port states, tasks, containers, grid dimensions, and failed-action diagnostics. Writes are limited to selected task and configuration endpoints.
-
-Low-level motor, gripper, and raw robot commands are excluded. Allowed writes still create MFC tasks, so the controller plans and validates the physical work. The UI checks the allowlist after every model response; mentioning another endpoint in JSON does not grant access to it.
-
-### 3. Reads are automatic; writes are reviewed
-
-The UI may run approved read-only requests automatically, returning results to the model for up to three iterations. Every `POST`, however, becomes a visible plan with a plain-language summary, endpoint, and JSON body.
-
-The operator must approve that exact plan before it reaches the MFC. Plans above 100 writes require an extra confirmation. This catches ambiguous instructions that can produce valid requests with the wrong intent.
-
-### 4. Execution stops on the first error
-
-Approved writes run sequentially. If one fails, the rest are blocked rather than executed against an unexpected warehouse state. The result appears in the chat, where the model can explain the failure or propose a new plan.
+**Conclusion:** the LLM is valuable at the language boundary, where ambiguity is expected and every proposal can be reviewed. Deterministic software remains responsible for authorization, validation, execution, routing, and physical safety.
