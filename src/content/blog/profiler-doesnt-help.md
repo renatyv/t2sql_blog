@@ -1,16 +1,16 @@
 ---
-title: "All your agent needs is a read-only database access"
+title: "All your agent needs is read-only database access"
 description: "A three-arm BEAVER benchmark of raw database access, a full profile, and compact metadata."
 pubDate: "2026-08-15"
 ---
 
-**Main result.** Claude, codex and [pi coding agent](https://pi.dev/) don't need upfront summary of tables in your database to extract data or answer questions. In my experiments the full summary used **6× more input tokens** and made the agent explore the database 83% less often.
+**Main result.** Claude, Codex, and the [pi coding agent](https://pi.dev/) don't need an upfront summary of the tables in your database to extract data or answer questions. In my experiments, the full summary used **6× more input tokens** and made the agent explore the database 83% less often.
 
 ## Proof
 
-I expected pre-generated metadata to save the agent (claude or codex or [pi](https://pi.dev/)) from rediscovering tables, joins, data types, and values. Winners of the famous text-to-SQL benchmark [BIRD](https://bird-bench.github.io/) [recommend](https://arxiv.org/abs/2505.19988) generating so-called 'profile', i.e. summary of every table: column names, types, examples, etc.
+I expected pre-generated metadata to save the agent (Claude, Codex, or [pi](https://pi.dev/)) from rediscovering tables, joins, data types, and values. Winners of the well-known text-to-SQL benchmark [BIRD](https://bird-bench.github.io/) [recommend](https://arxiv.org/abs/2505.19988) generating a so-called 'profile', i.e. a summary of every table: column names, types, examples, etc.
 
-Another file which should help discovering non-trivial table joining strategies is output of [schema-linker](https://pypi.org/project/schema-linker/). It efficiently compares sets of values of columns to find which one belong to the same set, generating a compact .md file as output.
+Another file that should help discover non-trivial table-joining strategies is the output of [schema-linker](https://pypi.org/project/schema-linker/). It efficiently compares sets of column values to find which columns belong to the same set, generating a compact .md file.
 
 So I tried three ways of giving the agent database context:
 
@@ -26,11 +26,11 @@ The question was simple: **does extra database context help a coding agent produ
 
 ## 1. The full profile did not improve accuracy
 
-**Dataset**. I used data of one of the latest text-to-sql benchmarks [BEAVER](https://beaverbench.github.io/#overview). It consists of three complete MYSQL database dumps called 'neutron', 'nova', and 'dw'. Plus, this benchmark provides a lot of pairs of textual request ('Give me the highest paid employee') and corresponding 'gold' query ('SELECT user.name, MAX(salary) FROM ...'). Some queries are extremly difficult, spanning many 10s of tables with complecated grouping and subqueries. These queries are verified by real experts to be correct.
+**Dataset.** I used data from one of the latest text-to-SQL benchmarks, [BEAVER](https://beaverbench.github.io/#overview). It consists of three complete MySQL database dumps called 'neutron', 'nova', and 'dw'. The benchmark also provides many pairs of textual requests ('Give me the highest paid employee') and corresponding 'gold' queries ('SELECT user.name, MAX(salary) FROM ...'). Some queries are extremely difficult, spanning tens of tables with complicated grouping and subqueries. These queries have been verified as correct by real experts.
 
 I gave 300 random questions to all three variants (raw access, raw + profile, raw + metadata) of the agent, 100 for each database (nova, neutron, dw).
 
-**Execution accuracy.** — whether the generated SQL returned the same result as the reference query.
+**Execution accuracy:** whether the generated SQL returned the same result as the reference query.
 
 | Database | Raw DB access | Full profile | Change |
 |---|---:|---:|---:|
@@ -54,7 +54,7 @@ The agent read the profile, asked fewer questions, and reached the wrong answer 
 
 ## Compact metadata matched raw access, but did not beat it
 
-Maybe the full profile was simply too much context. I added a third arm with a brief 20-50-line summary generated from the profile and chema-linker. The same coding agent generated each summary in the same sandbox, with no access to benchmark questions or answers. The files described clarified semantics and potential join strategies, including predicates and cardinality caveats.
+Maybe the full profile was simply too much context. I added a third arm with a brief 20–50-line summary generated from the profile and schema-linker. The same coding agent generated each summary in the same sandbox, with no access to benchmark questions or answers. The summaries clarified semantics and potential join strategies, including predicates and cardinality caveats.
 
 **Results**
 
@@ -69,12 +69,12 @@ Compact metadata changed which questions the agent answered correctly, but not a
 
 ## How I tested
 
-The beaver benchmark is public, anyone can see the correct 'gold' SQL queries to the questions from the dataset. Hell, they are in the benchmark repository itself!
+The BEAVER benchmark is public, so anyone can see the correct 'gold' SQL queries for the questions in the dataset. Hell, they are in the benchmark repository itself!
 
 - Three MySQL dumps from BEAVER: 'neutron', 'nova', and 'dw'.
-- 100 seed-fixed questions per database.
+- 100 fixed-seed questions per database.
 - [pi coding agent](https://pi.dev/) with GPT-5.6 Luna PRO via OpenRouter at medium effort.
-- A fresh Docker container per question. A `SELECT`-only database account, and network access limited to the database and OpenRouter. Prevents agent from looking up answers locally or leaking information from one question to another.
+- A fresh Docker container per question, a `SELECT`-only database account, and network access limited to the database and OpenRouter. This prevents the agent from looking up answers locally or leaking information from one question to another.
 
 I also found four harness problems—an implicit context limit, leaked `LIMIT 5`, truncated query output, and runs that ended without SQL. I describe the fixes in [Four Benchmark Settings That Can Distort a SQL Agent Test](/blog/text-to-sql-benchmark-harness/).
 
