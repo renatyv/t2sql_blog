@@ -1,12 +1,12 @@
 ---
-title: "Four Benchmark Settings That Can Distort a SQL Agent Test"
+title: "How I ruined my AI data pipeline by overengineering it"
 description: "Four easy-to-miss settings that can make a text-to-SQL agent test misleading."
 pubDate: "2026-08-24"
 ---
 
-**TL;DR:** A text-to-SQL benchmark is credible only if the harness lets the agent return complete SQL under explicit, reproducible limits. I found four settings that violated that rule: a leaked `LIMIT 5`, a 100-row display cap, no reserved answer turn, and an implicit 128k context window.
+**TL;DR:** An AI agent trying to use the SQL database is credible only if the harness lets the agent return complete SQL under explicit, reproducible limits. I found four settings that violated that rule: a leaked `LIMIT 5`, a 100-row display cap, no reserved answer turn, and an implicit 128k context window.
 
-I found these problems while testing whether a [database profile helps a coding agent](/blog/profiler-doesnt-help/). I used [BEAVER](https://huggingface.co/datasets/BeaverBench/beaver), where every question has a database and a reference SQL query, and **pi**, a command-line coding agent that could inspect the database and return SQL.
+I found these problems while testing whether a [database profile helps a coding agent](/blog/profiler-doesnt-help/). I used [BEAVER](https://huggingface.co/datasets/BeaverBench/beaver), where every question has a database and a reference SQL query, and popular [pi](https://pi.dev/) coding agent that could inspect the database and return SQL.
 
 The goal was to measure SQL ability. The complication was that small runner conveniences could change what the agent wrote, hide data from it, or prevent an answer. I therefore made four controls explicit:
 
@@ -42,15 +42,3 @@ Turn 15 is now answer-only: database tools are disabled after turn 14, and the a
 The **context window** covers the question, instructions, conversation, and database output. For an unrecognized model, pi assumed 128,000 tokens. That was a fallback, not a deliberate experiment setting or necessarily the model's actual limit.
 
 I now configure the window explicitly so repeated runs use the same intended limit.
-
-## The controlled harness
-
-- A new, unprivileged Docker container isolates each question. MySQL remains in a separate shared container.
-- A `SELECT`-only account can read all tables in the three BEAVER schemas—`neutron`, `nova`, and `dw`—but not other databases or MySQL system schemas.
-- Every arm receives the same seed-fixed questions.
-- Database tools return complete query results.
-- Each question gets at most 15 responses, with the last reserved for SQL.
-- The context window is explicit.
-- Accuracy, tokens, turns, database queries, cost, and runtime are recorded.
-
-**Conclusion:** benchmark the agent, not the runner. Remove accidental restrictions, make intentional limits explicit, and record enough operational data to explain the score.
