@@ -1,10 +1,10 @@
 ---
-title: "Use Low Reasoning for SQL Accuracy—and Skip the Critic"
+title: "Use Low Reasoning for database data analysis—and Skip the Critic"
 description: "Reasoning effort, SQL critics, and profile retrieval tested on 498 BIRD Mini-Dev questions."
 pubDate: "2026-08-26"
 ---
 
-**TL;DR:** Use low reasoning effort with raw database access as the default for this SQL agent. It delivered the highest measured accuracy with the simplest setup. If latency matters more, turn reasoning off and add the profile bundle. Do not add a critic sub-agent: it cost 53% more without improving accuracy.
+**TL;DR:** Use low reasoning effort with raw database access as the default for extracting data by generating SQL queries. It delivered the highest measured accuracy with the simplest setup. If latency matters more, turn reasoning off and add the database profile bundle generated with [db-snooper](https://pypi.org/project/db-snooper/). Do not add a critic sub-agent: it cost 53% more without improving accuracy.
 
 I tested four changes to the earlier [text-to-SQL benchmark](/blog/profiler-doesnt-help/): medium versus low reasoning, reasoning off, a fresh-context critic, and selective retrieval from a database profile. The low-effort and reasoning-off comparisons each used the same 498 [BIRD Mini-Dev](https://bird-bench.github.io/) questions in both arms. **Execution accuracy**—whether generated SQL matched the reference result—was the primary metric.
 
