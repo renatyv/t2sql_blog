@@ -45,3 +45,8 @@ The declared relationship supplies context; the inferred relationship is the new
 The same map helps with multi-table SQL, unfamiliar databases, join debugging, and legacy-schema documentation. Query timeouts and table-size gates keep discovery bounded.
 
 **Conclusion:** a schema-link file is evidence about likely join paths, not proof of business meaning. Combine weak signals, verify them against real values, and keep the result smaller than the problem it explains.
+
+## References
+
+- [schema-linker on GitHub](https://github.com/renatyv/schema-linker)
+- [Automatic Metadata Extraction for Text-to-SQL](https://arxiv.org/abs/2505.19988)

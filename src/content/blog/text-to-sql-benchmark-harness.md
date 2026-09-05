@@ -33,3 +33,8 @@ To test the resulting agent and harness I chose data from the [BEAVER](https://h
 2. The database executed each query in full, but the tool showed the agent only the first 100 rows. This cap did not alter BEAVER's reference answer, and the evaluator still ran the final SQL separately. It restricted what the agent could inspect.
 3. A **turn** is one agent response, which may contain database queries or final SQL. I allowed 15 turns per question to bound cost and runtime, but some runs spent all 15 inspecting tables and never answered. The fix was to force the agent on turn 13 to try to produce a final answer and use turn 14 to try to repair it using 'steering'. Turn 15 is now answer-only: database tools are disabled, and the agent must return its best SQL.
 4. I tried the latest DeepSeek-V4-Flash, which was not recognized by PI agent at the time. As a result, the agent assumed that the context-window limit was 128k tokens. That was not enough for everything: the agent's prompt, the question, SQL queries, and query results.
+
+## References
+
+- [pi coding agent](https://pi.dev/)
+- [BEAVER text-to-SQL benchmark dataset](https://huggingface.co/datasets/BeaverBench/beaver)

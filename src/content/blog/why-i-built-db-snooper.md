@@ -60,3 +60,9 @@ Profiling adapts to the data instead of applying one statistic everywhere:
 Delimited identifiers preserve spaces, reserved words, and case. One latest row plus two random rows gives samples some variety without turning the profile into a copy of the database.
 
 **Conclusion:** generate database context once, but organize it for selective reading. The durable artifact is the smallest trustworthy map an agent can navigate—not the largest file the database can produce.
+
+## References
+
+- [db-snooper on GitHub](https://github.com/renatyv/db-snooper)
+- [AI data analytic: All your agent needs is read-only database access](/blog/profiler-doesnt-help/)
+- [AI data analytic: Ideas for optimizing cost and speed](/blog/text-to-sql-critic-toc-schema-links/)

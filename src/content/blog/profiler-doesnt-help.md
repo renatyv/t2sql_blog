@@ -68,3 +68,13 @@ Maybe the full profile was simply too much context? Indeed, the profile size was
 | **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **27/300 (9.0%)** | **0 pp** |
 
 Compact metadata changed which questions the agent answered correctly, but not aggregate accuracy. The per-database differences are only a few questions and are descriptive, not evidence of improvement. The harness also has a fourth arm combining the full profile and metadata, but the headline run used three.
+
+## References
+
+- [BIRD text-to-SQL benchmark](https://bird-bench.github.io/)
+- [Automatic Metadata Extraction for Text-to-SQL](https://arxiv.org/abs/2505.19988)
+- [db-snooper](https://pypi.org/project/db-snooper/)
+- [schema-linker](https://pypi.org/project/schema-linker/)
+- [pi coding agent](https://pi.dev/)
+- [BEAVER text-to-SQL benchmark](https://beaverbench.github.io/#overview)
+- [AI data analytic: Pitfalls in implementing AI agent](/blog/text-to-sql-benchmark-harness/)

@@ -73,3 +73,13 @@ So I updated added the table of contents to db-snooper and re-run the same 500 q
 | Input-token premium over raw | about 40% | about 24% | <span class="metric-good">16 pp less overhead</span> |
 
 Retrieval reduced prompt overhead, but the agent replaced SQL exploration with profile reads and did not become more accurate. The earlier full-profile run was faster, although that is not a clean speed comparison because the prompt and runner protocols changed.
+
+## References
+
+- [BIRD text-to-SQL benchmark](https://bird-bench.github.io/)
+- [db-snooper](https://pypi.org/project/db-snooper/)
+- [schema-linker](https://pypi.org/project/schema-linker/)
+- [pi coding agent](https://pi.dev/)
+- [OpenRouter](https://openrouter.ai/)
+- [AI data analytic: All your agent needs is read-only database access](/blog/profiler-doesnt-help/)
+- [AI data analytic: Pitfalls in implementing AI agent](/blog/text-to-sql-benchmark-harness/)
