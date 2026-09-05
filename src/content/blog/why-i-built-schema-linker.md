@@ -1,5 +1,5 @@
 ---
-title: "Your Database Is Hiding Join Paths From Your SQL Agent"
+title: "Discovering Join Paths For Your AI Agent"
 description: "A compact map of missing database joins for SQL agents—and the false positives that shaped it."
 pubDate: "2026-08-27"
 ---

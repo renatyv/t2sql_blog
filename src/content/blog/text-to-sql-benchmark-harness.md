@@ -1,44 +1,35 @@
 ---
-title: "How I ruined my AI data pipeline by overengineering it"
+title: "AI data analytic. Pitfalls in implementing AI agent"
 description: "Four easy-to-miss settings that can make a text-to-SQL agent test misleading."
 pubDate: "2026-08-24"
 ---
 
-**TL;DR:** An AI agent trying to use the SQL database is credible only if the harness lets the agent return complete SQL under explicit, reproducible limits. I found four settings that violated that rule: a leaked `LIMIT 5`, a 100-row display cap, no reserved answer turn, and an implicit 128k context window.
+**TL;DR:** While building and AI data analytic angent I tried to limit him from spending too many tokens by modifying the harness. This backfired badly: resulting SQLs were not always correct.
 
-I found these problems while testing whether a [database profile helps a coding agent](/blog/profiler-doesnt-help/). I used [BEAVER](https://huggingface.co/datasets/BeaverBench/beaver), where every question has a database and a reference SQL query, and popular [pi](https://pi.dev/) coding agent that could inspect the database and return SQL.
+## Introduction
 
-The goal was to measure SQL ability. The complication was that small runner conveniences could change what the agent wrote, hide data from it, or prevent an answer. I therefore made four controls explicit:
+Nowadays, almost every company wants an AI analytics feature. The idea is to have a UI where anyone can ask a question like, 'How much did we earn this week?' and get graphs and reports back.
 
-| Test setting | Failure | Control |
-|---|---|---|
-| Ask for `LIMIT 5` during exploration | The limit leaked into final SQL | Let the agent choose when to sample |
-| Show at most 100 result rows | The agent could not inspect a complete large result | Return complete results |
-| Allow 15 responses without reserving an answer | A run could end before producing SQL | Make response 15 answer-only |
-| Let pi choose the context window | It used a 128,000-token fallback | Set the value explicitly |
+Inevitably, one of the first things the AI agent behind the scenes does is generate SQL queries to extract valuable data from the database.
 
-The values `5`, `100`, `15`, and `128k` are configuration settings, not accuracy results. I observed these failure modes while building the runner; I did not isolate an accuracy effect for each fix.
+I did the same. But one cannot simply let the agent explore data freely. There are passwords and other sensitive information. Also, we can't allow it to spend $100 worth of tokens every time — we need to limit it somehow. My ideas to limit the AI agent looked reasonable:
 
-## 1. Keep exploration hints out of the final answer
+- Ask the agent to add `LIMIT 5` to SQL queries it issues during exploration
+- Limit the final result to 100 rows
+- Limit the number of queries an agent can make during 'exploration' phase to 15
 
-I asked the agent to add `LIMIT 5` to exploratory queries to keep output short. It sometimes copied the limit into its final SQL even when the question asked for all matching rows. The query logic could be right while the answer remained incomplete.
+## Test setup
 
-I removed the instruction. The agent can still add a small limit when it needs a sample.
+For the AI agent, I needed something lightweight and easy to modify, so I chose the popular [pi](https://pi.dev/) coding agent. It is as powerful as claude or codex, yet is easy to modify and get telemetry from: log tool calls, limit number of SQL queries an agent can submit to database, limit tool access.
+It took only couple of prompts to limit number of 'turns', i.e. number of times he could send an SQL query and get back the result. In a similar way an 'sql_query' tool was created, which allowed to query the database without leaking login and password to the LLM. This tool also capped number of lines returned as a qery result to 100.
 
-## 2. Let the agent inspect complete results
+To test the resulting agent and harness I chose data from the [BEAVER](https://huggingface.co/datasets/BeaverBench/beaver) text-to-SQL benchmark. It contains database dumps and pairs of (text question, reference SQL query) – perfect for my needs. 
 
-The database executed each query in full, but the tool showed the agent only the first 100 rows. Some BEAVER reference queries return thousands.
+**Preventing AI from cheating.** The BEAVER benchmark is public, so anyone can see the correct 'gold' SQL queries for the questions in the dataset. To isolate the AI agent I used a fresh Docker container per question with a `SELECT`-only database account, and network access limited to the database and OpenRouter. This prevented AI from looking up answers locally, on the internet or leaking sensitive information from one question to another.
 
-This cap did not alter BEAVER's reference answer, and the evaluator still ran the final SQL separately. It restricted what the agent could inspect. I removed the cap; exploratory queries can still use an intentional `LIMIT`.
+## Results and learnings
 
-## 3. Reserve a turn for the answer
-
-A **turn** is one agent response, which may contain database queries or final SQL. I allowed 15 turns per question to bound cost and runtime, but one run spent all 15 inspecting tables and never answered.
-
-Turn 15 is now answer-only: database tools are disabled after turn 14, and the agent must return its best SQL. Missing SQL still counts as failure.
-
-## 4. Set the context window explicitly
-
-The **context window** covers the question, instructions, conversation, and database output. For an unrecognized model, pi assumed 128,000 tokens. That was a fallback, not a deliberate experiment setting or necessarily the model's actual limit.
-
-I now configure the window explicitly so repeated runs use the same intended limit.
+1. The agent sometimes copied the 'limit 5' into its final SQL even when the question asked for all matching rows. The query logic could be right while the answer remained incomplete. I removed it, and, yet had no problems with exceeding the token budget.
+2. The database executed each query in full, but the tool showed the agent only the first 100 rows. This cap did not alter BEAVER's reference answer, and the evaluator still ran the final SQL separately. It restricted what the agent could inspect.
+3. A **turn** is one agent response, which may contain database queries or final SQL. I allowed 15 turns per question to bound cost and runtime, but some runs spent all 15 inspecting tables and never answered. The fix was to force the agent on turn 13 to try to produce a final answer and use turn 14 to try to repair it using 'steering'. Turn 15 is now answer-only: database tools are disabled, and the agent must return its best SQL.
+4. I tried the latest DeepSeek-V4-Flash, which was not recognized by PI agent at the time. As a result, the agent assumed that the context-window limit was 128k tokens. That was not enough for everything: the agent's prompt, the question, SQL queries, and query results.
