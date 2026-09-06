@@ -4,7 +4,7 @@ description: "A compact database profile for SQL agents—and the mistakes that 
 pubDate: "2026-08-27"
 ---
 
-**TL;DR:** [db-snooper](https://github.com/renatyv/db-snooper) turns a database into compact Markdown for SQL agents. A useful profile is not a dump: it keeps the facts needed to understand tables and joins, makes them cheap to retrieve, and omits the rest.
+**TL;DR:** [db-snooper](https://pypi.org/project/db-snooper/) turns a database into compact Markdown for SQL agents. A useful profile is not a dump: it keeps the facts needed to understand tables and joins, makes them cheap to retrieve, and omits the rest.
 
 I built db-snooper because a text-to-SQL agent kept relearning the same tables, joins, data types, and filter values. A plain schema was insufficient—`status text` says much less than `active=8,412, cancelled=327`—but sending every statistic created too much context.
 
@@ -64,5 +64,6 @@ Delimited identifiers preserve spaces, reserved words, and case. One latest row 
 ## References
 
 - [db-snooper on GitHub](https://github.com/renatyv/db-snooper)
+- [db-snooper on PyPi](https://pypi.org/project/db-snooper/)
 - [AI data analytic: All your agent needs is read-only database access](/blog/profiler-doesnt-help/)
 - [AI data analytic: Ideas for optimizing cost and speed](/blog/text-to-sql-critic-toc-schema-links/)

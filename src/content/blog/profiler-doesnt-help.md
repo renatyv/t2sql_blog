@@ -36,10 +36,10 @@ The question was simple: **does extra database context help a coding agent produ
 
 | Database | Raw DB access | Full profile | Change |
 |---|---:|---:|---:|
-| neutron | 13/100 (13%) | 13/100 (13%) | 0 pp |
-| nova | 9/100 (9%) | 8/100 (8%) | −1 pp |
-| dw | 5/100 (5%) | 4/100 (4%) | −1 pp |
-| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **−0.7 pp** |
+| neutron | 13/100 (13%) | 13/100 (13%) | <span class="metric-neutral">0 pp</span> |
+| nova | 9/100 (9%) | 8/100 (8%) | <span class="metric-neutral">−1 pp</span> |
+| dw | 5/100 (5%) | 4/100 (4%) | <span class="metric-neutral">−1 pp</span> |
+| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | <span class="metric-neutral">−0.7 pp</span> |
 
 The profile produced no aggregate gain.
 
@@ -47,10 +47,10 @@ The profile produced no aggregate gain.
 
 | Metric | Raw DB access | Full profile | Change |
 |---|---:|---:|---:|
-| Execution accuracy ↑ | 27/300 (9.0%) | 25/300 (8.3%) | −0.7 pp |
-| Input tokens/question ↓ | 1× baseline | about 6× | about +500% |
-| Turns/question ↓ | 4.6 | 2.2 | −52% |
-| DB queries/question ↓ | 7.8 | 1.3 | −83% |
+| Execution accuracy ↑ | 27/300 (9.0%) | 25/300 (8.3%) | <span class="metric-neutral">−0.7 pp</span> |
+| Input tokens/question ↓ | 1× baseline | about 6× | <span class="metric-bad">about +500%</span> |
+| Turns/question ↓ | 4.6 | 2.2 | <span class="metric-good">−52%</span> |
+| DB queries/question ↓ | 7.8 | 1.3 | <span class="metric-good">−83%</span> |
 
 The agent read the profile, asked fewer questions, and reached the wrong answer faster. On the largest database, the profile text alone added about nine times the raw-access arm's input-token volume per run.
 
@@ -62,10 +62,10 @@ Maybe the full profile was simply too much context? Indeed, the profile size was
 
 | Database | Raw DB access | Full profile | Compact metadata | Metadata vs raw |
 |---|---:|---:|---:|---:|
-| neutron | 13/100 (13%) | 13/100 (13%) | 13/100 (13%) | 0 pp |
-| nova | 9/100 (9%) | 8/100 (8%) | 11/100 (11%) | +2 pp |
-| dw | 5/100 (5%) | 4/100 (4%) | 3/100 (3%) | −2 pp |
-| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **27/300 (9.0%)** | **0 pp** |
+| neutron | 13/100 (13%) | 13/100 (13%) | 13/100 (13%) | <span class="metric-neutral">0 pp</span> |
+| nova | 9/100 (9%) | 8/100 (8%) | 11/100 (11%) | <span class="metric-neutral">+2 pp</span> |
+| dw | 5/100 (5%) | 4/100 (4%) | 3/100 (3%) | <span class="metric-neutral">−2 pp</span> |
+| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **27/300 (9.0%)** | <span class="metric-neutral">0 pp</span> |
 
 Compact metadata changed which questions the agent answered correctly, but not aggregate accuracy. The per-database differences are only a few questions and are descriptive, not evidence of improvement. The harness also has a fourth arm combining the full profile and metadata, but the headline run used three.
 
