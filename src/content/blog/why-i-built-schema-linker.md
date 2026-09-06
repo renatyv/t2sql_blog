@@ -1,53 +1,47 @@
 ---
 title: "Discovering Join Paths For Your AI Agent"
 description: "A compact map of missing database joins for SQL agents—and the false positives that shaped it."
-abstract: "schema-linker finds join paths that exist in the data but not in declared constraints. Names nominate candidates, independent signals narrow them, and exact value containment confirms direction—so an agent can use joins no one declared."
+abstract: "Real databases often contain join paths that exist in the data but are absent from declared constraints, and schema-linker finds them. It treats every inferred relationship as a candidate: names propose it, several independent signals support it, and exact value containment verifies it."
 pubDate: "2026-08-27"
 ---
 
-Real databases often contain join paths that exist in the data but are absent from declared constraints, and [schema-linker](https://github.com/renatyv/schema-linker) finds them. It treats every inferred relationship as a candidate: names propose it, several independent signals support it, and exact value containment verifies it.
+The AI agent sometimes chooses the wrong tables or invents a join because real databases have incomplete foreign keys. For example, *'support_tickets.customer_id'* may refer to *'customers.customer_id'* without a declared constraint. The challenge is that shared names or values can also create convincing nonsense. I built [schema-linker](https://github.com/renatyv/schema-linker) tool to help an AI agent discover missing joins without mistaking coincidence for structure. It supports SQLite, PostgreSQL, MySQL, MariaDB, and DuckDB.
 
-Text-to-SQL often fails before the SQL becomes complicated. The agent chooses the wrong tables or invents a join because real databases have incomplete foreign keys. For example, `support_tickets.customer_id` may refer to `customers.customer_id` without a declared constraint.
+## How it works
 
-The challenge is that shared names or values can also create convincing nonsense. I built schema-linker to answer one question: **how can an agent discover missing joins without mistaking coincidence for structure?** The answer has three parts:
+schema-linker checks possible relationships from cheapest to most expensive, discarding weak candidates at each step.
 
-1. Narrow candidates with cheap structural signals.
-2. Verify direction against actual values.
-3. Present related columns as one compact domain, not a noisy list of pairs.
+### 1. Find plausible column pairs
 
-## 1. Use names to nominate, not prove
+It starts with declared primary and foreign keys, column names and types, row counts, and estimated distinct-value counts. Existing foreign keys are already known, incompatible data types cannot form useful joins, and near-unique free-text columns are poor identifiers, so those pairs are skipped. Similar names such as `orders.customer_id` and `customers.customer_id` identify the remaining pairs worth checking against the data.
 
-The project was inspired by [*Automatic Metadata Extraction for Text-to-SQL*](https://arxiv.org/abs/2505.19988): understanding database contents is often harder than writing the query.
+### 2. Check which column points to which
 
-schema-linker supports SQLite, PostgreSQL, MySQL, MariaDB, and DuckDB. It begins with tables, keys, types, row counts, and distinct counts, then rejects known foreign keys, incompatible types, empty columns, and near-unique text.
+A foreign-key relationship only needs to work in one direction: every value in `orders.customer_id` must exist in `customers.customer_id`, but many customers may have no orders. Suppose the orders contain customer IDs `{1, 2}` and the customers contain `{1, 2, 3, 4, 5}`. [Jaccard similarity](https://en.wikipedia.org/wiki/Jaccard_index) divides the two shared values by the five values found in either column, giving only 40%. schema-linker asks a more useful question: what percentage of the order customer IDs exist in the customer table? Here, both of them do, so the result is 100%. To avoid comparing every pair value by value, [MinHash](https://en.wikipedia.org/wiki/MinHash) creates a small fingerprint of each column's values, and [LSH Ensemble](https://en.wikipedia.org/wiki/Locality-sensitive_hashing) uses those fingerprints to find column pairs likely to match. Only those pairs receive an exact check: in memory for small sets, or with an SQL anti-join for large ones.
 
-Names, ID shape, cardinality, and MinHash containment nominate the remaining candidates. No single signal is enough. Columns called `status`, `type`, or even `customer_id` can belong to unrelated domains.
+Finding every value from one column in the other is not enough by itself. Two unrelated flags containing `0` and `1` have the same values but would create a many-to-many join. schema-linker rejects such flag pairs unless one column is a primary or unique key, and reports a relationship only when at least three independent signals agree.
 
-## 2. Verify directional containment exactly
+### 3. Group evidence into a compact join map
 
-Parent and child columns often have very different set sizes. Every `orders.customer_id` may appear in `customers.customer_id` even when many customers have no orders, so symmetric Jaccard similarity can make a valid relationship look weak.
+Pairwise output multiplies noise: four columns in one customer-ID domain can produce many redundant relationships. schema-linker groups them under a primary-key anchor. A report with declared links enabled can look like this:
 
-schema-linker instead checks directional containment. MinHash and LSH Ensemble reduce the candidate set; every reported relationship must then pass an exact containment check in memory or SQL. Large sets use an anti-join rather than being loaded into memory.
-
-Small domains need an extra guard. Two unrelated flags containing `0` and `1` have perfect containment but produce a cross-product when joined. Flag pairs are rejected unless one side is a primary or unique key.
-
-## 3. Group evidence into a compact join map
-
-Pairwise output multiplies noise: four columns in one customer-ID domain can produce many redundant relationships. schema-linker groups them under a primary-key anchor:
-
-```text
+<pre style="padding: 0.75rem; font-size: 0.75em; line-height: 1.25; margin: 0.75em 0"><code># Schema Links
+- version: 0.0.5
+- dialect: sqlite
+- database: examples/shop.sqlite
+- schema: main
+## Declared PK/FK Links
+order_lines.order_id -> orders.order_id
+orders.customer_id -> customers.customer_id
+## Inferred Links
 ### customers.customer_id
 - inferred: support_tickets.customer_id
-- declared: orders.customer_id
-```
-
-The declared relationship supplies context; the inferred relationship is the new signal. Detailed evidence and declared-only sections remain available for debugging but are omitted by default to save tokens. Dialect-aware quoting preserves spaces, reserved words, and case.
-
-The same map helps with multi-table SQL, unfamiliar databases, join debugging, and legacy-schema documentation. Query timeouts and table-size gates keep discovery bounded.
-
-**Conclusion:** a schema-link file is evidence about likely join paths, not proof of business meaning. Combine weak signals, verify them against real values, and keep the result smaller than the problem it explains.
+- declared: orders.customer_id</code></pre>
 
 ## References
 
 1. [schema-linker on GitHub](https://github.com/renatyv/schema-linker)
 1. [Automatic Metadata Extraction for Text-to-SQL](https://arxiv.org/abs/2505.19988)
+1. [Jaccard index](https://en.wikipedia.org/wiki/Jaccard_index)
+1. [MinHash](https://en.wikipedia.org/wiki/MinHash)
+1. [Locality-sensitive hashing](https://en.wikipedia.org/wiki/Locality-sensitive_hashing)
