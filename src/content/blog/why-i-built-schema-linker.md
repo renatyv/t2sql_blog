@@ -25,7 +25,8 @@ Finding every value from one column in the other is not enough by itself. Two un
 
 Pairwise output multiplies noise: four columns in one customer-ID domain can produce many redundant relationships. schema-linker groups them under a primary-key anchor. A report with declared links enabled can look like this:
 
-<pre style="padding: 0.75rem; font-size: 0.75em; line-height: 1.25; margin: 0.75em 0"><code># Schema Links
+```text
+# Schema Links
 - version: 0.0.5
 - dialect: sqlite
 - database: examples/shop.sqlite
@@ -36,7 +37,8 @@ orders.customer_id -> customers.customer_id
 ## Inferred Links
 ### customers.customer_id
 - inferred: support_tickets.customer_id
-- declared: orders.customer_id</code></pre>
+- declared: orders.customer_id
+```
 
 ## References
 

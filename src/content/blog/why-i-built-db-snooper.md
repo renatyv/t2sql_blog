@@ -5,19 +5,11 @@ abstract: "db-snooper turns a database into compact Markdown for SQL agents. A u
 pubDate: "2026-08-27"
 ---
 
-I built db-snooper because a text-to-SQL agent kept relearning the same tables, joins, data types, and filter values. A plain schema was insufficient—`status text` says much less than `active=8,412, cancelled=327`—but sending every statistic created too much context.
+I built db-snooper because a text-to-SQL agent kept relearning the same tables, joins, data types, and filter values. A plain schema dump was insufficient, because often column name and type are not enough: `status text` says much less than `active=8,412, cancelled=327`.
 
-The design question became: **how can a profile carry enough evidence without overwhelming the agent?** Three choices made it useful:
+## 1. What is in the output.
 
-1. Keep schema and data shape together in one compact table block.
-2. Let the agent retrieve only the blocks relevant to its question.
-3. Bound expensive profiling and degrade gracefully when introspection fails.
-
-## 1. Keep the useful facts together
-
-db-snooper supports SQLite, PostgreSQL, MySQL, MariaDB, DuckDB, BigQuery, and matching RDS databases. It creates one Markdown profile per schema plus a table of contents.
-
-Each table block combines structure with data shape:
+The database schema summary created by db-snooper is a plain text file with full profile, plus a table of contents. Each table block combines structure with data shape:
 
 ```text
 # "orders"  (rows=128420)
@@ -33,19 +25,19 @@ Blocks can include types, constraints, distributions, indexes, relationships, an
 
 This makes the file useful for SQL generation, database exploration, migration review, and debugging without live production access. Because it contains real data, it must be protected like a database export.
 
-## 2. Make the profile retrievable
+## 2. How it works
 
 The pipeline has three steps:
 
 1. Inspect tables, views, columns, keys, and indexes.
-2. Profile columns according to table size and data shape.
+2. Gather stats for each column according to table size and data shape.
 3. Render contiguous table blocks and record their line ranges in a table of contents.
 
-For a large database, an agent reads the TOC and loads only the relevant blocks. One line per column and a hash-pinned TOC avoid repeating the same facts across DDL, statistics, and samples.
+For a large database, an agent can read the table of contents (TOC) and load only the relevant blocks. One line per column and a TOC avoid repeating the same facts across DDL, statistics, and samples.
 
 This matters because more context does not guarantee better SQL. In my first [benchmark](/blog/profiler-doesnt-help/), putting the full profile in every prompt used about six times more input tokens without improving accuracy. A later [retrieval experiment](/blog/text-to-sql-critic-toc-schema-links/) reduced that overhead by loading selected blocks.
 
-## 3. Bound the work and handle imperfect databases
+## 3. Handling real-world databases
 
 Profiling adapts to the data instead of applying one statistic everywhere:
 
@@ -57,8 +49,6 @@ Profiling adapts to the data instead of applying one statistic everywhere:
 - If reflection fails on views, partial indexes, restricted accounts, or dialect plugins, db-snooper falls back to `pg_dump --schema-only` or `mysqldump --no-data` and skips data profiling rather than losing the table.
 
 Delimited identifiers preserve spaces, reserved words, and case. One latest row plus two random rows gives samples some variety without turning the profile into a copy of the database.
-
-**Conclusion:** generate database context once, but organize it for selective reading. The durable artifact is the smallest trustworthy map an agent can navigate—not the largest file the database can produce.
 
 ## References
 
