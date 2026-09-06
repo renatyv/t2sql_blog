@@ -74,7 +74,34 @@ p {
 	margin-bottom: 1em;
 }
 .prose p {
-	margin-bottom: 2em;
+	margin: 0;
+}
+.prose p + p {
+	text-indent: 1.5em;
+}
+.prose h2 {
+	font-size: 1.35em;
+}
+.prose h3 {
+	font-size: 1.15em;
+}
+.prose h4,
+.prose h5,
+.prose h6 {
+	font-size: 1em;
+}
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+	margin-top: 1.6em;
+}
+.prose ul,
+.prose ol,
+.prose pre,
+.prose blockquote {
+	margin: 1em 0;
 }
 textarea {
 	width: 100%;

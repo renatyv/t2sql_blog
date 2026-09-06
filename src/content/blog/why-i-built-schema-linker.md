@@ -1,10 +1,11 @@
 ---
 title: "Discovering Join Paths For Your AI Agent"
 description: "A compact map of missing database joins for SQL agents—and the false positives that shaped it."
+abstract: "schema-linker finds join paths that exist in the data but not in declared constraints. Names nominate candidates, independent signals narrow them, and exact value containment confirms direction—so an agent can use joins no one declared."
 pubDate: "2026-08-27"
 ---
 
-**TL;DR:** [schema-linker](https://github.com/renatyv/schema-linker) finds join paths that exist in the data but are absent from database constraints. It treats every inferred relationship as a candidate: names propose it, several independent signals support it, and exact value containment verifies it.
+Real databases often contain join paths that exist in the data but are absent from declared constraints, and [schema-linker](https://github.com/renatyv/schema-linker) finds them. It treats every inferred relationship as a candidate: names propose it, several independent signals support it, and exact value containment verifies it.
 
 Text-to-SQL often fails before the SQL becomes complicated. The agent chooses the wrong tables or invents a join because real databases have incomplete foreign keys. For example, `support_tickets.customer_id` may refer to `customers.customer_id` without a declared constraint.
 
@@ -48,5 +49,5 @@ The same map helps with multi-table SQL, unfamiliar databases, join debugging, a
 
 ## References
 
-- [schema-linker on GitHub](https://github.com/renatyv/schema-linker)
-- [Automatic Metadata Extraction for Text-to-SQL](https://arxiv.org/abs/2505.19988)
+1. [schema-linker on GitHub](https://github.com/renatyv/schema-linker)
+1. [Automatic Metadata Extraction for Text-to-SQL](https://arxiv.org/abs/2505.19988)

@@ -1,12 +1,11 @@
 ---
 title: "AI data analytic. All your agent needs is read-only database access"
 description: "A three-arm BEAVER benchmark of raw database access, a full profile, and compact metadata."
+abstract: "On 300 questions of BEAVER text-to-sql benchmark, a full database profile did not improve an AI agent's accuracy: raw read-only access answered 27 of 300 questions correctly versus 25 of 300 with the profile—while using about six times fewer input tokens and exploring the database 83% more."
 pubDate: "2026-08-15"
 ---
 
-**Main result.** The AI agents don't neceseraly need an upfront summary of the tables in your database to extract data or answer questions. In my experiments, the full summary used **6× more input tokens**, but made the agent explore the database 83% less often.
-
-## Experiment
+## Problem
 
 I expected pre-generated metadata to save the AI agent from rediscovering tables, joins, data types, and values. Winners of the well-known text-to-SQL benchmark [BIRD](https://bird-bench.github.io/) [recommend](https://arxiv.org/abs/2505.19988) generating a so-called 'profile' using [db-snooper](https://pypi.org/project/db-snooper/), i.e. a summary of every table: column names, types, examples, etc.
 
@@ -22,59 +21,57 @@ So I tried three ways of giving the agent database context:
 
 The question was simple: **does extra database context help a coding agent produce more correct SQL?** In this setup, the answer was no. Three results support that conclusion:
 
-1. A full profile scored 25/300, versus 27/300 with raw database access.
+1. A full profile answered 25 of 300 questions correctly, versus 27 of 300 with raw database access.
 2. The profile made the agent cheaper in database calls but far more expensive in prompt tokens.
-3. Compact metadata matched raw access at 27/300, but did not beat it.
+3. Compact metadata matched raw access at 27 of 300, but did not beat it.
 
-### 1. The full profile did not improve accuracy
+## 1. The full profile did not improve accuracy
 
-**Dataset.** I used data from one of the latest text-to-SQL benchmarks, [BEAVER](https://beaverbench.github.io/#overview). It consists of three complete MySQL database dumps called 'neutron', 'nova', and 'dw'. The benchmark also provides many pairs of textual requests ('Give me the highest paid employee') and corresponding 'gold' queries ('SELECT user.name, MAX(salary) FROM ...'). Some queries are extremely difficult, spanning tens of tables with complicated grouping and subqueries. According to BEAVER authors, the golden queries have been verified as correct by real experts. The sample spans all kinds of queries: easy, medium, requiring domain knowledge and others. Evenly distributed across all 3 databases: nova, neutron, and dw. 
+### Dataset
 
-#### Results
+I used data from one of the latest text-to-SQL benchmarks, [BEAVER](https://beaverbench.github.io/#overview). It consists of three complete MySQL database dumps called 'neutron', 'nova', and 'dw'. The benchmark also provides many pairs of textual requests ('Give me the highest paid employee') and corresponding 'gold' queries ('SELECT user.name, MAX(salary) FROM ...'). Some queries are extremely difficult, spanning tens of tables with complicated grouping and subqueries. According to BEAVER authors, the golden queries have been verified as correct by real experts. The sample spans all kinds of queries: easy, medium, requiring domain knowledge and others. Evenly distributed across all 3 databases: nova, neutron, and dw. 
 
-**Execution accuracy:** whether the generated SQL returned the same result as the reference query.
+### Results
 
-| Database | Raw DB access | Full profile | Change |
-|---|---:|---:|---:|
-| neutron | 13/100 (13%) | 13/100 (13%) | <span class="metric-neutral">0 pp</span> |
-| nova | 9/100 (9%) | 8/100 (8%) | <span class="metric-neutral">−1 pp</span> |
-| dw | 5/100 (5%) | 4/100 (4%) | <span class="metric-neutral">−1 pp</span> |
-| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | <span class="metric-neutral">−0.7 pp</span> |
-
-The profile produced no aggregate gain.
-
-**Cost.**
+**Execution accuracy:** whether the generated SQL returned the same result as the reference query. The tables below show how many questions the agent answered correctly, out of 100 per database and 300 overall; the percentage is in parentheses.
 
 | Metric | Raw DB access | Full profile | Change |
 |---|---:|---:|---:|
-| Execution accuracy ↑ | 27/300 (9.0%) | 25/300 (8.3%) | <span class="metric-neutral">−0.7 pp</span> |
-| Input tokens/question ↓ | 1× baseline | about 6× | <span class="metric-bad">about +500%</span> |
-| Turns/question ↓ | 4.6 | 2.2 | <span class="metric-good">−52%</span> |
-| DB queries/question ↓ | 7.8 | 1.3 | <span class="metric-good">−83%</span> |
+| Correct answers on neutron (of 100) | 13 (13%) | 13 (13%) | <span class="metric-neutral">0 pp</span> |
+| Correct answers on nova (of 100) | 9 (9%) | 8 (8%) | <span class="metric-neutral">−1 pp</span> |
+| Correct answers on dw (of 100) | 5 (5%) | 4 (4%) | <span class="metric-neutral">−1 pp</span> |
+| **Correct answers overall (of 300)** | **27 (9.0%)** | **25 (8.3%)** | <span class="metric-neutral">−0.7 pp</span> |
+
+| Cost metric | Raw DB access | Full profile | Change |
+|---|---:|---:|---:|
+| Execution accuracy (of 300) | 27 (9.0%) | 25 (8.3%) | <span class="metric-neutral">−0.7 pp</span> |
+| Input tokens/question | 1× baseline | about 6× | <span class="metric-bad">about +500%</span> |
+| Turns/question | 4.6 | 2.2 | <span class="metric-good">−52%</span> |
+| DB queries/question | 7.8 | 1.3 | <span class="metric-good">−83%</span> |
 
 The agent read the profile, asked fewer questions, and reached the wrong answer faster. On the largest database, the profile text alone added about nine times the raw-access arm's input-token volume per run.
 
-## Side quest: compact metadata
+## 2. Side quest: compact metadata
 
 Maybe the full profile was simply too much context? Indeed, the profile size was about 200kb for 'dw' database. So, the obviouse idea is to summarize it with a brief 20–50-line file, generated from the full profile and schema-linker outputs. The same coding agent generated each summary, with no access to benchmark questions or answers, or the internet to prevent leaking sensible gld queries or domain info. The summaries clarified semantics and potential join strategies, including predicates and cardinality caveats.
 
-**Results**
+### 2.1. Results
 
-| Database | Raw DB access | Full profile | Compact metadata | Metadata vs raw |
+| Metric | Raw DB access | Full profile | Compact metadata | Metadata vs raw |
 |---|---:|---:|---:|---:|
-| neutron | 13/100 (13%) | 13/100 (13%) | 13/100 (13%) | <span class="metric-neutral">0 pp</span> |
-| nova | 9/100 (9%) | 8/100 (8%) | 11/100 (11%) | <span class="metric-neutral">+2 pp</span> |
-| dw | 5/100 (5%) | 4/100 (4%) | 3/100 (3%) | <span class="metric-neutral">−2 pp</span> |
-| **Overall** | **27/300 (9.0%)** | **25/300 (8.3%)** | **27/300 (9.0%)** | <span class="metric-neutral">0 pp</span> |
+| Correct answers on neutron (of 100) | 13 (13%) | 13 (13%) | 13 (13%) | <span class="metric-neutral">0 pp</span> |
+| Correct answers on nova (of 100) | 9 (9%) | 8 (8%) | 11 (11%) | <span class="metric-neutral">+2 pp</span> |
+| Correct answers on dw (of 100) | 5 (5%) | 4 (4%) | 3 (3%) | <span class="metric-neutral">−2 pp</span> |
+| **Correct answers overall (of 300)** | **27 (9.0%)** | **25 (8.3%)** | **27 (9.0%)** | <span class="metric-neutral">0 pp</span> |
 
 Compact metadata changed which questions the agent answered correctly, but not aggregate accuracy. The per-database differences are only a few questions and are descriptive, not evidence of improvement. The harness also has a fourth arm combining the full profile and metadata, but the headline run used three.
 
 ## References
 
-- [BIRD text-to-SQL benchmark](https://bird-bench.github.io/)
-- [Automatic Metadata Extraction for Text-to-SQL](https://arxiv.org/abs/2505.19988)
-- [db-snooper](https://pypi.org/project/db-snooper/)
-- [schema-linker](https://pypi.org/project/schema-linker/)
-- [pi coding agent](https://pi.dev/)
-- [BEAVER text-to-SQL benchmark](https://beaverbench.github.io/#overview)
-- [AI data analytic: Pitfalls in implementing AI agent](/blog/text-to-sql-benchmark-harness/)
+1. [BIRD text-to-SQL benchmark](https://bird-bench.github.io/)
+1. [Automatic Metadata Extraction for Text-to-SQL](https://arxiv.org/abs/2505.19988)
+1. [db-snooper](https://pypi.org/project/db-snooper/)
+1. [schema-linker](https://pypi.org/project/schema-linker/)
+1. [pi coding agent](https://pi.dev/)
+1. [BEAVER text-to-SQL benchmark](https://beaverbench.github.io/#overview)
+1. [AI data analytic: Pitfalls in implementing AI agent](/blog/text-to-sql-benchmark-harness/)

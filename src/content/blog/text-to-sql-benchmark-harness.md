@@ -1,10 +1,9 @@
 ---
 title: "AI data analytic. Pitfalls in implementing AI agent"
 description: "Four easy-to-miss settings that can make a text-to-SQL agent test misleading."
+abstract: "While building an AI data analytic agent I tried to limit it from spending too many tokens by modifying the harness. This backfired badly: resulting SQLs were not always correct."
 pubDate: "2026-08-24"
 ---
-
-**TL;DR:** While building and AI data analytic angent I tried to limit him from spending too many tokens by modifying the harness. This backfired badly: resulting SQLs were not always correct.
 
 ## Introduction
 
@@ -36,5 +35,5 @@ To test the resulting agent and harness I chose data from the [BEAVER](https://h
 
 ## References
 
-- [pi coding agent](https://pi.dev/)
-- [BEAVER text-to-SQL benchmark dataset](https://huggingface.co/datasets/BeaverBench/beaver)
+1. [pi coding agent](https://pi.dev/)
+1. [BEAVER text-to-SQL benchmark dataset](https://huggingface.co/datasets/BeaverBench/beaver)
