@@ -5,12 +5,12 @@ import HeaderLink from './HeaderLink.astro';
 
 <header>
 	<nav>
-		<h2><a href="/">{SITE_TITLE}</a></h2>
 		<div class="internal-links">
-			<!-- <HeaderLink href="/">Home</HeaderLink> -->
-			<HeaderLink href="/blog">Blog</HeaderLink>
-			<HeaderLink href="/about">About</HeaderLink>
+			<HeaderLink href="/">Home</HeaderLink>
+			<HeaderLink href="/blog">All articles</HeaderLink>
+			<HeaderLink href="/about">About me</HeaderLink>
 		</div>
+		<h2><a href="/">{SITE_TITLE}</a></h2>
 	</nav>
 </header>
 <style>
@@ -49,6 +49,13 @@ import HeaderLink from './HeaderLink.astro';
 		display: flex;
 	}
 	@media (max-width: 720px) {
+		nav {
+			flex-wrap: wrap;
+		}
+		nav h2 {
+			order: -1;
+			width: 100%;
+		}
 		.social-links {
 			display: none;
 		}

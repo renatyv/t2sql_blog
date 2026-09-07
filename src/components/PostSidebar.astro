@@ -1,0 +1,90 @@
+---
+import { getCollection } from 'astro:content';
+import FormattedDate from './FormattedDate.astro';
+
+interface Props {
+	currentSlug?: string;
+}
+
+const { currentSlug } = Astro.props;
+const posts = (await getCollection('blog')).sort(
+	(a, b) => b.data.pubDate.valueOf() - a.data.pubDate.valueOf(),
+);
+---
+
+<nav class="post-sidebar" aria-label="Posts">
+	<h2 class="heading">Posts</h2>
+	<ul>
+		{
+			posts.map((post) => (
+				<li>
+					<a
+						href={`/blog/${post.id}/`}
+						aria-current={post.id === currentSlug ? 'page' : undefined}
+						class={post.id === currentSlug ? 'current' : undefined}
+					>
+						<span class="title">{post.data.title}</span>
+						<span class="date">
+							<FormattedDate date={post.data.pubDate} />
+						</span>
+					</a>
+				</li>
+			))
+		}
+	</ul>
+</nav>
+
+<style>
+	.post-sidebar {
+		position: sticky;
+		top: 2em;
+		align-self: flex-start;
+		width: 230px;
+		flex: none;
+	}
+	.heading {
+		margin: 0 0 0.5em;
+		font-size: 0.8rem;
+		font-weight: 600;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+		color: rgb(var(--gray));
+	}
+	ul {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		border-top: 1px solid rgb(var(--gray-light));
+	}
+	li {
+		border-bottom: 1px solid rgb(var(--gray-light));
+	}
+	a {
+		display: flex;
+		flex-direction: column;
+		gap: 0.1em;
+		padding: 0.6em 0;
+		text-decoration: none;
+	}
+	.title {
+		color: rgb(var(--black));
+		font-size: 0.85rem;
+		line-height: 1.35;
+	}
+	.date {
+		color: rgb(var(--gray));
+		font-size: 0.75rem;
+	}
+	a:hover .title {
+		color: var(--accent);
+	}
+	a.current .title {
+		color: var(--accent);
+		font-weight: 700;
+	}
+	@media (max-width: 1023px) {
+		.post-sidebar {
+			display: none;
+		}
+	}
+</style>
